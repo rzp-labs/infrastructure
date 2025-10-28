@@ -95,14 +95,14 @@
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "remoteUser": "vscode",
   "containerEnv": {
-    "PATH": "/home/vscode/.local/bin:/home/vscode/go/bin:${containerEnv:PATH}",
     "UV_PROJECT_ENVIRONMENT": "/workspaces/infrastructure/.venv-container"
+  },
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/bin:/home/vscode/go/bin:${containerEnv:PATH}",
+    "SSH_AUTH_SOCK": "/home/vscode/.1password/t/agent.sock"
   },
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly,type=bind",
     "source=${localEnv:HOME}/Library/Group Containers/2BUA8C4S2C.com.1password,target=/home/vscode/.1password,type=bind"
-  ],
-  "remoteEnv": {
-    "SSH_AUTH_SOCK": "/home/vscode/.1password/t/agent.sock"
-  }
+  ]
 }
