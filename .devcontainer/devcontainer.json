@@ -10,14 +10,47 @@
   "customizations": {
     "vscode": {
       "extensions": [
+        // Ansible & YAML
         "redhat.ansible",
         "redhat.vscode-yaml",
+
+        // Python
         "ms-python.python",
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
-        "EditorConfig.EditorConfig",
+        "teticio.python-envy",
+
+        // Shell
         "timonwong.shellcheck",
-        "foxundermoon.shell-format"
+        "foxundermoon.shell-format",
+
+        // Code Quality & Linting
+        "EditorConfig.EditorConfig",
+        "codacy-app.codacy",
+        "sonarsource.sonarlint-vscode",
+
+        // Git & GitHub
+        "eamodio.gitlens",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+
+        // AI Assistants
+        "anthropic.claude-code",
+        "codeium.windsurfpyright",
+        "coderabbit.coderabbit-vscode",
+        "google.gemini-cli-vscode-ide-companion",
+        "google.geminicodeassist",
+
+        // DevContainers
+        "ms-azuretools.vscode-containers",
+
+        // Formatting & Utilities
+        "esbenp.prettier-vscode",
+        "matthewnespor.vscode-color-identifiers-mode",
+        "mechatroner.rainbow-csv",
+
+        // UI/Themes
+        "miguelsolorio.fluent-icons"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
