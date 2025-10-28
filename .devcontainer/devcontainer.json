@@ -61,8 +61,10 @@
         "miguelsolorio.fluent-icons"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "ansible.python.interpreterPath": "/usr/local/bin/python",
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv-container/bin/python",
+        "ansible.python.interpreterPath": "${workspaceFolder}/.venv-container/bin/python",
+        "ansible.validation.lint.enabled": true,
+        "ansible.validation.lint.path": "${workspaceFolder}/.venv-container/bin/ansible-lint",
         "files.associations": {
           "*.yml": "yaml",
           "*.yaml": "yaml"
