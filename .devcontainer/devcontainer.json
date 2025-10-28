@@ -83,7 +83,8 @@
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "remoteUser": "vscode",
   "containerEnv": {
-    "PATH": "/home/vscode/.local/bin:/home/vscode/go/bin:${containerEnv:PATH}"
+    "PATH": "/home/vscode/.local/bin:/home/vscode/go/bin:${containerEnv:PATH}",
+    "UV_PROJECT_ENVIRONMENT": "/workspaces/infrastructure/.venv-container"
   },
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly,type=bind",

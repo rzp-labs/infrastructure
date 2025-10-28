@@ -85,6 +85,7 @@ venv/
 env/
 ENV/
 .venv/
+.venv-container/
 uv.lock
 
 # Node (if using)
