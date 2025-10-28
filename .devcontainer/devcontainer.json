@@ -53,6 +53,9 @@
         "esbenp.prettier-vscode",
         "matthewnespor.vscode-color-identifiers-mode",
         "mechatroner.rainbow-csv",
+        "usernamehw.errorlens",
+        "mikestead.dotenv",
+        "ms-vscode.makefile-tools",
 
         // UI/Themes
         "miguelsolorio.fluent-icons"
