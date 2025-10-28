@@ -1,4 +1,4 @@
-.PHONY: setup lint format install-docker deploy deploy-all
+.PHONY: setup lint format install-docker deploy deploy-all check-deploy
 
 setup:
 	uv sync
@@ -46,6 +46,17 @@ deploy:
 
 deploy-all:
 	uv run ansible-playbook playbooks/deploy-all-stacks.yml
+
+check-deploy:
+	@echo "🔍 Syntax check..."
+	uv run ansible-playbook playbooks/deploy-all-stacks.yml --syntax-check
+	@echo "✓ Syntax valid"
+	@echo ""
+	@echo "🔍 Linting..."
+	uv run ansible-lint playbooks/deploy-all-stacks.yml
+	@echo ""
+	@echo "🔍 Dry-run (check mode)..."
+	uv run ansible-playbook playbooks/deploy-all-stacks.yml --check
 
 ping:
 	uv run ansible homelab -m ping

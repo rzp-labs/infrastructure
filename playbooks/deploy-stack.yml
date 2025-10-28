@@ -34,6 +34,7 @@
         delete: true
         rsync_opts:
           - "--exclude=.env"
+        use_ssh_args: true
 
     - name: Check if .env file exists on remote
       ansible.builtin.stat:

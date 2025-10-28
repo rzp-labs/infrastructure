@@ -22,6 +22,7 @@
         rsync_opts:
           - "--exclude=.env"
           - "--exclude=*.example"
+        use_ssh_args: true
 
     - name: Check for required .env files
       ansible.builtin.stat:
@@ -47,13 +48,22 @@
         state: touch
         mode: '0600'
 
-    - name: Deploy all stacks with root orchestrator
+    - name: Deploy docker-socket-proxy stack
       community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dest_dir }}"
+        project_src: "{{ stacks_dest_dir }}/docker-socket-proxy"
         state: present
         pull: "always"
-      register: output
+      register: socket_proxy_output
 
-    - name: Show deployment result
+    - name: Deploy traefik stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dest_dir }}/traefik"
+        state: present
+        pull: "always"
+      register: traefik_output
+
+    - name: Show deployment results
       ansible.builtin.debug:
-        var: output
+        msg:
+          - "Docker Socket Proxy: {{ socket_proxy_output.changed }}"
+          - "Traefik: {{ traefik_output.changed }}"
