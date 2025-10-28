@@ -10,5 +10,14 @@
     docker_users:
       - admin  # Change this to your SSH user
 
+  pre_tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - gnupg
+          - ca-certificates
+        state: present
+        update_cache: true
+
   roles:
     - geerlingguy.docker
