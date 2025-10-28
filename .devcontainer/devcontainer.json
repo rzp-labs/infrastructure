@@ -5,7 +5,12 @@
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false
     },
-    "ghcr.io/devcontainers/features/git:1": {}
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installMaven": false,
+      "installGradle": false
+    }
   },
   "customizations": {
     "vscode": {
@@ -27,6 +32,7 @@
         // Code Quality & Linting
         "EditorConfig.EditorConfig",
         "codacy-app.codacy",
+        "sonarsource.sonarlint-vscode",
 
         // Git & GitHub
         "eamodio.gitlens",
