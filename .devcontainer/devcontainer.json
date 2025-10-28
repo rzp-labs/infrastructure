@@ -65,6 +65,7 @@
         "ansible.python.interpreterPath": "${workspaceFolder}/.venv-container/bin/python",
         "ansible.validation.lint.enabled": true,
         "ansible.validation.lint.path": "${workspaceFolder}/.venv-container/bin/ansible-lint",
+        "sonarlint.ls.javaHome": "/usr/lib/jvm/java-21-openjdk-arm64",
         "files.associations": {
           "*.yml": "yaml",
           "*.yaml": "yaml"
