@@ -1,0 +1,14 @@
+---
+- name: Install Docker on homelab hosts
+  hosts: homelab
+  become: true
+
+  vars:
+    docker_install_compose_plugin: false  # We want standalone docker-compose, not the plugin
+    docker_install_compose: true
+    docker_compose_version: "v2.32.1"
+    docker_users:
+      - admin  # Change this to your SSH user
+
+  roles:
+    - geerlingguy.docker

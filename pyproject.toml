@@ -1,0 +1,23 @@
+[project]
+name = "infrastructure"
+version = "0.1.0"
+description = "Homelab infrastructure as code using Ansible and Docker"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ansible>=2.15",
+    "ansible-lint>=6.0",
+    "yamllint>=1.32",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4"]

@@ -1,0 +1,11 @@
+---
+all:
+  children:
+    homelab:
+      hosts:
+        debian-docker:
+          ansible_host: 10.0.0.100  # Replace with your VM's IP address
+          ansible_user: admin  # Replace with your SSH user
+          ansible_python_interpreter: /usr/bin/python3
+          # If using 1Password SSH agent with multiple keys:
+          # ansible_ssh_common_args: '-o IdentityAgent=$SSH_AUTH_SOCK -o IdentitiesOnly=yes -o IdentityFile=~/.ssh/your-key-file'
