@@ -1,0 +1,59 @@
+---
+- name: Deploy all stacks using root orchestrator
+  hosts: homelab
+  become: true
+
+  vars:
+    stacks_src_dir: "../stacks"
+    stacks_dest_dir: "/opt/stacks"
+
+  tasks:
+    - name: Create stacks directory on remote host
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Sync all stack files to remote host
+      ansible.posix.synchronize:
+        src: "{{ stacks_src_dir }}/"
+        dest: "{{ stacks_dest_dir }}/"
+        delete: true
+        rsync_opts:
+          - "--exclude=.env"
+          - "--exclude=*.example"
+
+    - name: Check for required .env files
+      ansible.builtin.stat:
+        path: "{{ stacks_dest_dir }}/{{ item }}/.env"
+      register: env_files
+      loop:
+        - traefik
+
+    - name: Warn about missing .env files
+      ansible.builtin.debug:
+        msg: "WARNING: {{ item.item }}/.env not found - service may fail to start"
+      when: not item.stat.exists
+      loop: "{{ env_files.results }}"
+
+    - name: Create proxy network
+      community.docker.docker_network:
+        name: proxy
+        state: present
+
+    - name: Set permissions on acme.json for traefik
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/traefik/acme.json"
+        state: touch
+        mode: '0600'
+
+    - name: Deploy all stacks with root orchestrator
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dest_dir }}"
+        state: present
+        pull: "always"
+      register: output
+
+    - name: Show deployment result
+      ansible.builtin.debug:
+        var: output

@@ -1,4 +1,4 @@
-.PHONY: setup lint format install-docker deploy
+.PHONY: setup lint format install-docker deploy deploy-all
 
 setup:
 	uv sync
@@ -43,6 +43,9 @@ deploy:
 		exit 1; \
 	fi
 	uv run ansible-playbook playbooks/deploy-stack.yml -e stack=$(stack)
+
+deploy-all:
+	uv run ansible-playbook playbooks/deploy-all-stacks.yml
 
 ping:
 	uv run ansible homelab -m ping
