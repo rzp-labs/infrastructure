@@ -232,7 +232,9 @@ The [.devcontainer/setup.sh](.devcontainer/setup.sh) post-create script runs `ma
 - Inventory: `inventory/hosts.yml`
 - Privilege escalation: Automatically uses sudo
 - Python interpreter: Auto-detected (`auto_silent`)
-- Host key checking: Disabled (for homelab convenience)
+- Host key checking: Enabled (default) for security against MITM attacks
+  - For initial setup of new hosts, use: `ANSIBLE_HOST_KEY_CHECKING=False make deploy stack=...`
+  - After first connection, host key will be in `~/.ssh/known_hosts` and subsequent connections are verified
 
 **Deployment Idempotency:**
 - Playbooks can be run multiple times safely

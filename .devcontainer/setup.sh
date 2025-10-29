@@ -1,6 +1,7 @@
 #!/bin/bash
 # Description: Bootstrap system tools and environment inside DevContainer
 set -euo pipefail
+trap 'echo "❌ Error on line $LINENO"; exit 1' ERR
 
 echo "🚀 Setting up DevContainer system tools..."
 
@@ -15,12 +16,12 @@ for rc in ~/.bashrc ~/.zshrc; do
   # shellcheck disable=SC2016  # Keep $HOME and $PATH literal for future shells
   if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$rc" 2>/dev/null; then
     # shellcheck disable=SC2016
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$rc"
   fi
   # shellcheck disable=SC2016
   if ! grep -q 'export PATH="$HOME/go/bin:$PATH"' "$rc" 2>/dev/null; then
     # shellcheck disable=SC2016
-    echo 'export PATH="$HOME/go/bin:$PATH"' >> "$rc"
+    echo 'export PATH="$HOME/go/bin:$PATH"' >>"$rc"
   fi
 done
 
@@ -38,12 +39,16 @@ chmod 700 ~/.ssh 2>/dev/null || true
 chmod 600 ~/.ssh/* 2>/dev/null || true
 
 # === Configure 1Password SSH agent ===
-if [ -S /home/vscode/.1password/agent.sock ]; then
-  if ! grep -q "SSH_AUTH_SOCK" ~/.zshrc 2>/dev/null; then
-    echo 'export SSH_AUTH_SOCK=/home/vscode/.1password/agent.sock' >> ~/.zshrc
-  fi
+SSH_AGENT_SOCK="$HOME/.1password/agent.sock"
+if [ -S "$SSH_AGENT_SOCK" ]; then
+  for rc in ~/.bashrc ~/.zshrc; do
+    [ -f "$rc" ] || continue
+    if ! grep -q "SSH_AUTH_SOCK" "$rc" 2>/dev/null; then
+      echo "export SSH_AUTH_SOCK='$SSH_AGENT_SOCK'" >>"$rc"
+    fi
+  done
 else
-  echo "⚠️  Warning: 1Password SSH agent socket not found at /home/vscode/.1password/agent.sock"
+  echo "⚠️  Warning: 1Password SSH agent socket not found at $SSH_AGENT_SOCK"
 fi
 
 # === Install project dependencies ===
@@ -85,6 +90,3 @@ echo "  make ping"
 echo "  make install-docker"
 echo "  make deploy stack=<name>"
 echo ""
-
-# === Optional trap for debugging ===
-trap 'echo "❌ Error on line $LINENO"; exit 1' ERR

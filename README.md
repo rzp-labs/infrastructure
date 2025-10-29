@@ -51,13 +51,28 @@ ansible_user: admin       # Your SSH user
 
 **Note for 1Password users**: If using 1Password SSH agent with multiple keys, uncomment and configure the `ansible_ssh_common_args` line to specify your identity file.
 
-### 3. Install Docker on VM
+### 3. Verify SSH Connectivity
+
+Test that you can reach the VM and accept its SSH host key:
+
+```bash
+make ping
+```
+
+**First-time connection**: If you see a host key verification prompt, you'll need to accept the VM's SSH fingerprint. You can either:
+- Run the ping command and answer "yes" when prompted
+- Manually SSH once: `ssh admin@YOUR_VM_IP` (then exit)
+- For automated setup, temporarily disable checking: `ANSIBLE_HOST_KEY_CHECKING=False make ping`
+
+After the first connection, the host key is saved to `~/.ssh/known_hosts` and all future connections are verified against it for security.
+
+### 4. Install Docker on VM
 
 ```bash
 make install-docker
 ```
 
-### 4. Deploy Docker Socket Proxy
+### 5. Deploy Docker Socket Proxy
 
 For security, deploy the socket proxy first:
 
@@ -65,7 +80,7 @@ For security, deploy the socket proxy first:
 make deploy stack=docker-socket-proxy
 ```
 
-### 5. Configure Traefik
+### 6. Configure Traefik
 
 SSH to the VM and create `/opt/stacks/traefik/.env`:
 
@@ -83,13 +98,13 @@ DOMAIN=your-domain.com
 TZ=America/Phoenix
 ```
 
-### 6. Deploy Traefik
+### 7. Deploy Traefik
 
 ```bash
 make deploy stack=traefik
 ```
 
-### 7. Configure DNS & Port Forwarding
+### 8. Configure DNS & Port Forwarding
 
 **DNS (Cloudflare):**
 - Create A record: `*.yourdomain.com` → Your public IP
