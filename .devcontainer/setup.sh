@@ -43,8 +43,10 @@ SSH_AGENT_SOCK="$HOME/.1password/agent.sock"
 if [ -S "$SSH_AGENT_SOCK" ]; then
   for rc in ~/.bashrc ~/.zshrc; do
     [ -f "$rc" ] || continue
+    # shellcheck disable=SC2016  # Keep $HOME literal for future shells
     if ! grep -q "SSH_AUTH_SOCK" "$rc" 2>/dev/null; then
-      echo "export SSH_AUTH_SOCK='$SSH_AGENT_SOCK'" >>"$rc"
+      # shellcheck disable=SC2016
+      echo 'export SSH_AUTH_SOCK="$HOME/.1password/agent.sock"' >>"$rc"
     fi
   done
 else
