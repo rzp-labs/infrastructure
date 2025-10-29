@@ -14,12 +14,12 @@ export PATH="$HOME/.local/bin:$PATH"
 for rc in ~/.bashrc ~/.zshrc; do
   [ -f "$rc" ] || continue
   # shellcheck disable=SC2016  # Keep $HOME and $PATH literal for future shells
-  if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$rc" 2>/dev/null; then
+  if ! grep -qE '^[[:space:]]*export[[:space:]]+PATH=.*\$HOME/\.local/bin' "$rc" 2>/dev/null; then
     # shellcheck disable=SC2016
     echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$rc"
   fi
   # shellcheck disable=SC2016
-  if ! grep -q 'export PATH="$HOME/go/bin:$PATH"' "$rc" 2>/dev/null; then
+  if ! grep -qE '^[[:space:]]*export[[:space:]]+PATH=.*\$HOME/go/bin' "$rc" 2>/dev/null; then
     # shellcheck disable=SC2016
     echo 'export PATH="$HOME/go/bin:$PATH"' >>"$rc"
   fi
@@ -44,7 +44,7 @@ if [ -S "$SSH_AGENT_SOCK" ]; then
   for rc in ~/.bashrc ~/.zshrc; do
     [ -f "$rc" ] || continue
     # shellcheck disable=SC2016  # Keep $HOME literal for future shells
-    if ! grep -q "SSH_AUTH_SOCK" "$rc" 2>/dev/null; then
+    if ! grep -qE '^[[:space:]]*export[[:space:]]+SSH_AUTH_SOCK=' "$rc" 2>/dev/null; then
       # shellcheck disable=SC2016
       echo 'export SSH_AUTH_SOCK="$HOME/.1password/agent.sock"' >>"$rc"
     fi
