@@ -1,42 +1,72 @@
 #!/bin/bash
-set -e
+# Description: Bootstrap system tools and environment inside DevContainer
+set -euo pipefail
 
 echo "🚀 Setting up DevContainer system tools..."
 
-# Install uv
+# === Install uv ===
 echo "📦 Installing uv..."
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
-# Install Go
-echo "🔧 Installing Go..."
-sudo apt-get update
-sudo apt-get install -y golang-go
+# === Update PATH in bash/zsh startup files ===
+for rc in ~/.bashrc ~/.zshrc; do
+  [ -f "$rc" ] || continue
+  # shellcheck disable=SC2016  # Keep $HOME and $PATH literal for future shells
+  if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$rc" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+  fi
+  # shellcheck disable=SC2016
+  if ! grep -q 'export PATH="$HOME/go/bin:$PATH"' "$rc" 2>/dev/null; then
+    # shellcheck disable=SC2016
+    echo 'export PATH="$HOME/go/bin:$PATH"' >> "$rc"
+  fi
+done
 
-# Install yamlfmt
-echo "📝 Installing yamlfmt..."
+# === Install Go and CLI tools ===
+echo "🔧 Installing Go and tools..."
+sudo apt-get update -y
+sudo apt-get install -y --no-install-recommends make golang-go
+sudo rm -rf /var/lib/apt/lists/*
 go install github.com/google/yamlfmt/cmd/yamlfmt@latest
-
-# Install shfmt
-echo "🐚 Installing shfmt..."
 go install mvdan.cc/sh/v3/cmd/shfmt@latest
 
-# Add Go bin to PATH
-echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.bashrc
-export PATH="$HOME/go/bin:$PATH"
-
-# Fix SSH permissions
+# === Fix SSH permissions ===
 echo "🔐 Fixing SSH permissions..."
 chmod 700 ~/.ssh 2>/dev/null || true
 chmod 600 ~/.ssh/* 2>/dev/null || true
 
-# Now run make setup to install project dependencies
+# === Configure 1Password SSH agent ===
+if [ -S /home/vscode/.1password/agent.sock ]; then
+  if ! grep -q "SSH_AUTH_SOCK" ~/.zshrc 2>/dev/null; then
+    echo 'export SSH_AUTH_SOCK=/home/vscode/.1password/agent.sock' >> ~/.zshrc
+  fi
+else
+  echo "⚠️  Warning: 1Password SSH agent socket not found at /home/vscode/.1password/agent.sock"
+fi
+
+# === Install project dependencies ===
 echo ""
 echo "📚 Installing project dependencies..."
-make setup
+if command -v make &>/dev/null; then
+  make setup
+else
+  echo "⚠️  Skipping make setup (make not found)"
+fi
 
-# Verify installations
+# === Reload updated shell environment ===
+if [ -n "${ZSH_VERSION-}" ]; then
+  echo "🔄 Reloading Zsh environment..."
+  # shellcheck source=/home/vscode/.zshrc disable=SC1091
+  source ~/.zshrc
+elif [ -n "${BASH_VERSION-}" ]; then
+  echo "🔄 Reloading Bash environment..."
+  # shellcheck source=/home/vscode/.bashrc disable=SC1091
+  source ~/.bashrc
+fi
+
+# === Verify installations ===
 echo ""
 echo "✅ DevContainer ready!"
 echo ""
@@ -49,9 +79,12 @@ echo ""
 uv run ansible --version | head -1
 echo ""
 echo "🎯 Quick commands:"
-echo "  make lint        - Lint code"
-echo "  make format      - Format code"
-echo "  make ping        - Test VM connectivity"
-echo "  make install-docker - Install Docker on VM"
-echo "  make deploy stack=<name> - Deploy a stack"
+echo "  make lint"
+echo "  make format"
+echo "  make ping"
+echo "  make install-docker"
+echo "  make deploy stack=<name>"
 echo ""
+
+# === Optional trap for debugging ===
+trap 'echo "❌ Error on line $LINENO"; exit 1' ERR

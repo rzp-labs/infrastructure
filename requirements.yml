@@ -1,9 +1,11 @@
 ---
 collections:
   - name: community.docker
-    version: ">=3.0.0"
+    version: "4.8.2"
+  - name: community.general
+    version: "9.5.0"
   - name: ansible.posix
-    version: ">=1.5.0"
+    version: "1.5.4"
 
 roles:
   - name: geerlingguy.docker

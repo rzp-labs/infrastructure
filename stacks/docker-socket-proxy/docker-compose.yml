@@ -5,9 +5,7 @@ services:
     container_name: docker-socket-proxy
     restart: unless-stopped
     networks:
-      - proxy
-    ports:
-      - 127.0.0.1:2375:2375
+      - socket-proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -32,5 +30,5 @@ services:
       - VOLUMES=0
 
 networks:
-  proxy:
-    external: true
+  socket-proxy:
+    internal: true

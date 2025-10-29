@@ -1,69 +1,57 @@
 ---
-- name: Deploy all stacks using root orchestrator
-  hosts: homelab
+- name: Deploy all stacks
+  hosts: all
   become: true
+  gather_facts: false
 
   vars:
-    stacks_src_dir: "../stacks"
-    stacks_dest_dir: "/opt/stacks"
+    stacks_dir: /opt/stacks
+    backup_dir: /opt/stack_backups
+    compose_backup_suffix: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+    stacks:
+      - plex
+      - traefik
+      - portainer
 
   tasks:
-    - name: Create stacks directory on remote host
+    - name: Ensure stack and backup directories exist
       ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}"
+        path: "{{ item }}"
         state: directory
-        mode: '0755'
-
-    - name: Sync all stack files to remote host
-      ansible.posix.synchronize:
-        src: "{{ stacks_src_dir }}/"
-        dest: "{{ stacks_dest_dir }}/"
-        delete: true
-        rsync_opts:
-          - "--exclude=.env"
-          - "--exclude=*.example"
-        use_ssh_args: true
-
-    - name: Check for required .env files
-      ansible.builtin.stat:
-        path: "{{ stacks_dest_dir }}/{{ item }}/.env"
-      register: env_files
+        mode: "0755"
       loop:
-        - traefik
+        - "{{ stacks_dir }}"
+        - "{{ backup_dir }}"
 
-    - name: Warn about missing .env files
-      ansible.builtin.debug:
-        msg: "WARNING: {{ item.item }}/.env not found - service may fail to start"
-      when: not item.stat.exists
-      loop: "{{ env_files.results }}"
+    - name: Back up current Compose files before deploy
+      community.general.archive:
+        path: "{{ stacks_dir }}"
+        dest: "{{ backup_dir }}/compose_backup_{{ compose_backup_suffix }}.tar.gz"
+        format: gz
+        mode: "0644"
+      register: backup_result
+      changed_when: backup_result.dest is defined
+      failed_when: backup_result.failed is defined and backup_result.failed
 
-    - name: Create proxy network
-      community.docker.docker_network:
-        name: proxy
-        state: present
-
-    - name: Set permissions on acme.json for traefik
-      ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/traefik/acme.json"
-        state: touch
-        mode: '0600'
-
-    - name: Deploy docker-socket-proxy stack
+    - name: Deploy all stacks with Docker Compose
       community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dest_dir }}/docker-socket-proxy"
+        project_src: "{{ stacks_dir }}/{{ item }}"
         state: present
-        pull: "always"
-      register: socket_proxy_output
-
-    - name: Deploy traefik stack
-      community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dest_dir }}/traefik"
-        state: present
-        pull: "always"
-      register: traefik_output
-
-    - name: Show deployment results
-      ansible.builtin.debug:
-        msg:
-          - "Docker Socket Proxy: {{ socket_proxy_output.changed }}"
-          - "Traefik: {{ traefik_output.changed }}"
+      loop: "{{ stacks }}"
+      register: deploy_results
+      failed_when: >
+        deploy_results is failed or (deploy_results.results | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0)
+    - name: Restore previous Compose files (on failure)
+      block:
+        - name: Restore backup if deployment failed
+          ansible.builtin.unarchive:
+            src: "{{ backup_dir }}/compose_backup_{{ compose_backup_suffix }}.tar.gz"
+            dest: /
+            remote_src: true
+          register: restore_result
+          changed_when: restore_result.changed | default(false)
+          failed_when: restore_result.failed | default(false)
+      rescue:
+        - name: Log failure during restore
+          ansible.builtin.debug:
+            msg: "⚠️ Failed to restore previous Compose files — manual recovery may be required."

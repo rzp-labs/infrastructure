@@ -7,11 +7,11 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - proxy
+      - socket-proxy
+      - traefik
     ports:
       - 80:80
       - 443:443
-      - 8080:8080  # Dashboard
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
       - TZ=${TZ}
@@ -36,5 +36,7 @@ services:
       - "traefik.http.routers.traefik-secure.service=api@internal"
 
 networks:
-  proxy:
+  socket-proxy:
+    internal: true
+  traefik:
     external: true

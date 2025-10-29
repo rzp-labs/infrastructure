@@ -3,12 +3,15 @@
 # Deploy all: docker compose up -d
 # Individual stacks can still be managed independently in their own directories
 
+# Shared networks owned by root compose
+networks:
+  default:
+    external: true
+  traefik:
+    external: true
+  socket-proxy:
+    internal: true
+
 include:
   - docker-socket-proxy/docker-compose.yml
   - traefik/docker-compose.yml
-
-# Shared networks owned by root compose
-networks:
-  proxy:
-    name: proxy
-    driver: bridge
