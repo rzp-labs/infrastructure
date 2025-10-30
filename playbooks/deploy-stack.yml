@@ -28,13 +28,12 @@
         mode: '0755'
 
     - name: Copy stack files to remote host
-      ansible.posix.synchronize:
+      ansible.builtin.copy:
         src: "{{ stacks_src_dir }}/{{ stack_name }}/"
         dest: "{{ stacks_dest_dir }}/{{ stack_name }}/"
-        delete: true
-        rsync_opts:
-          - "--exclude=.env"
-        use_ssh_args: true
+        mode: preserve
+      register: copy_result
+      changed_when: copy_result.changed
 
     - name: Check if .env file exists on remote
       ansible.builtin.stat:
