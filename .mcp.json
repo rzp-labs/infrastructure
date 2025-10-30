@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "api-supermemory-ai": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://api.supermemory.ai/mcp",
+        "--header",
+        "x-sm-project:rzp-labs"
+      ]
+    },
+    "python-language-server": {
+      "command": "mcp-language-server",
+      "args": [
+        "--workspace",
+        "/workspaces/infrastructure",
+        "--lsp",
+        "pyright-language-server",
+        "--",
+        "--stdio"
+      ]
+    }
+  }
+}
