@@ -5,13 +5,13 @@
   gather_facts: false
 
   vars:
+    stacks_src_dir: "../stacks"
     stacks_dir: /opt/stacks
     backup_dir: /opt/stack_backups
     compose_backup_suffix: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
     stacks:
-      - plex
+      - docker-socket-proxy
       - traefik
-      - portainer
 
   tasks:
     - name: Ensure stack and backup directories exist
@@ -22,6 +22,32 @@
       loop:
         - "{{ stacks_dir }}"
         - "{{ backup_dir }}"
+
+    - name: Create stack directories
+      ansible.builtin.file:
+        path: "{{ stacks_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ stacks }}"
+
+    - name: Copy stack files from local to remote
+      ansible.builtin.copy:
+        src: "{{ stacks_src_dir }}/{{ item }}/"
+        dest: "{{ stacks_dir }}/{{ item }}/"
+        mode: preserve
+      loop: "{{ stacks }}"
+
+    - name: Create proxy network
+      community.docker.docker_network:
+        name: proxy
+        state: present
+
+    - name: Set permissions on acme.json for traefik
+      ansible.builtin.file:
+        path: "{{ stacks_dir }}/traefik/acme.json"
+        state: touch
+        mode: '0600'
+      when: "'traefik' in stacks"
 
     - name: Back up current Compose files before deploy
       community.general.archive:
