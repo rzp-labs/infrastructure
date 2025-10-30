@@ -86,7 +86,13 @@ env/
 ENV/
 .venv/
 .venv-container/
-uv.lock
+
+# Build artifacts (Python)
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
 
 # Node (if using)
 node_modules/
