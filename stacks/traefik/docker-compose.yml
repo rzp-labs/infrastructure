@@ -6,14 +6,19 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    command:
+      - --configFile=/traefik.yml
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
+      - --log.level=DEBUG
     networks:
       - socket-proxy
-      - traefik
+      - proxy
     ports:
-      - 80:80
-      - 443:443
+      - 8080:80
+      - 8443:443
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - ACME_EMAIL=${ACME_EMAIL}
       - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -37,6 +42,7 @@ services:
 
 networks:
   socket-proxy:
-    internal: true
-  traefik:
+    name: socket-proxy
+    external: true
+  proxy:
     external: true
