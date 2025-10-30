@@ -45,6 +45,13 @@
         msg: "WARNING: .env file not found at {{ stacks_dest_dir }}/{{ stack_name }}/.env - copy .env.example and configure it"
       when: not env_file.stat.exists
 
+    - name: Create socket-proxy network if deploying docker-socket-proxy
+      community.docker.docker_network:
+        name: socket-proxy
+        internal: true
+        state: present
+      when: stack_name == 'docker-socket-proxy'
+
     - name: Create proxy network if deploying traefik
       community.docker.docker_network:
         name: proxy
