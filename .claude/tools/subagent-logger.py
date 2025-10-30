@@ -5,8 +5,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-from typing import NoReturn
+from typing import Any, NoReturn
 
 # Try to import centralized path config, fall back to .data if not available
 try:

@@ -14,8 +14,10 @@ repo_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(repo_root))
 
 from amplifier.utils.notifications.core import NotificationSender  # noqa: E402
-from amplifier.utils.notifications.models import ClaudeCodeHookInput  # noqa: E402
-from amplifier.utils.notifications.models import NotificationRequest  # noqa: E402
+from amplifier.utils.notifications.models import (  # noqa: E402
+    ClaudeCodeHookInput,
+    NotificationRequest,
+)
 
 
 def main():

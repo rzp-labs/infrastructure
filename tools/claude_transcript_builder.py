@@ -12,8 +12,7 @@ import json
 import logging
 import shutil
 import sys
-from datetime import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from compact_tracer import trace_lineage

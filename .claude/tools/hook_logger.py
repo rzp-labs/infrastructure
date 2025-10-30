@@ -105,8 +105,7 @@ class HookLogger:
     def cleanup_old_logs(self, days_to_keep: int = 7):
         """Clean up log files older than specified days"""
         try:
-            from datetime import date
-            from datetime import timedelta
+            from datetime import date, timedelta
 
             # Use date instead of datetime to avoid timezone issues
             today = datetime.now().date()

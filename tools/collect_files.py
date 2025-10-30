@@ -279,7 +279,9 @@ def format_output(
 def main() -> None:
     """Main function"""
     parser = argparse.ArgumentParser(
-        description="Recursively collect files matching the given patterns and output a document with file names and content."
+        description=(
+            "Recursively collect files matching the given patterns and output a document with file names and content."
+        )
     )
     parser.add_argument("patterns", nargs="+", help="File and/or directory patterns to collect (e.g. *.py or output)")
     parser.add_argument(

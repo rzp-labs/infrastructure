@@ -218,9 +218,8 @@ def main():
             print(f"cd {worktree_path} && source .venv/bin/activate && echo '\n✓ Switched to worktree: {feature_name}'")
         else:
             # Just change directory if venv wasn't created
-            print(
-                f"cd {worktree_path} && echo '\n✓ Switched to worktree: {feature_name} (run make install to set up environment)'"
-            )
+            msg = f"\\n✓ Switched to worktree: {feature_name} (run make install to set up environment)"
+            print(f"cd {worktree_path} && echo '{msg}'")
     else:
         # Running directly in TTY - show instructions
         print("\n✓ Worktree created successfully!")

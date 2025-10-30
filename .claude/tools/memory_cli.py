@@ -11,9 +11,7 @@ from typing import cast
 
 # Add amplifier to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from amplifier.memory import Memory
-from amplifier.memory import MemoryCategory
-from amplifier.memory import MemoryStore
+from amplifier.memory import Memory, MemoryCategory, MemoryStore
 
 
 def main():

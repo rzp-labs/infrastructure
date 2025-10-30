@@ -11,10 +11,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from dag_loader import Message
-from dag_loader import SessionData
-from dag_navigator import Branch
-from dag_navigator import ConversationTree
+from dag_loader import Message, SessionData
+from dag_navigator import Branch, ConversationTree
 
 logger = logging.getLogger(__name__)
 

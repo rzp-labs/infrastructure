@@ -7,8 +7,7 @@ and sidechains from the session data.
 """
 
 import logging
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
 
 from dag_loader import SessionData

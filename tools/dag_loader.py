@@ -9,10 +9,8 @@ It handles various message types and ensures data integrity.
 import contextlib
 import json
 import logging
-from dataclasses import dataclass
-from dataclasses import field
-from datetime import UTC
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -227,7 +225,8 @@ class DAGLoader:
         logger.info(f"Loaded {self.session_data.count_messages()} messages")
         if compact_boundary_uuids or compact_summary_uuids:
             logger.info(
-                f"Filtered {len(compact_boundary_uuids)} compact boundaries and {len(compact_summary_uuids)} compact summaries"
+                f"Filtered {len(compact_boundary_uuids)} compact boundaries "
+                f"and {len(compact_summary_uuids)} compact summaries"
             )
         if self.session_data.count_branches() > 0:
             logger.info(f"Found {self.session_data.count_branches()} branches")
@@ -484,7 +483,8 @@ class DAGLoader:
         # Log summary
         logger.info(f"Loaded {self.session_data.count_messages()} messages from chain")
         logger.info(
-            f"Filtered {len(compact_boundary_uuids)} compact boundaries and {len(compact_summary_uuids)} compact summaries"
+            f"Filtered {len(compact_boundary_uuids)} compact boundaries "
+            f"and {len(compact_summary_uuids)} compact summaries"
         )
         if self.session_data.count_branches() > 0:
             logger.info(f"Found {self.session_data.count_branches()} branches in merged DAG")

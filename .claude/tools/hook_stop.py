@@ -123,9 +123,8 @@ async def main():
                         # Debug: Show structure of first conversation message if available
                         if messages:
                             first_msg = messages[0]
-                            logger.debug(
-                                f"First conversation message keys: {list(first_msg.keys()) if isinstance(first_msg, dict) else 'Not a dict'}"
-                            )
+                            msg_keys = list(first_msg.keys()) if isinstance(first_msg, dict) else "Not a dict"
+                            logger.debug(f"First conversation message keys: {msg_keys}")
                             if isinstance(first_msg, dict):
                                 # Show message structure without full content
                                 msg_preview = {
