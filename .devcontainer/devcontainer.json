@@ -1,6 +1,9 @@
 {
   "name": "Homelab Infrastructure",
-  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false
@@ -92,14 +95,21 @@
       }
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup.sh && ln -sf /workspaces/infrastructure/.venv-container/bin/ansible /usr/local/bin/ansible",
+  "initializeCommand": [
+    "bash",
+    ".devcontainer/initialize.sh"
+  ],
+  "postCreateCommand": [
+    "bash",
+    ".devcontainer/setup.sh"
+  ],
+  "postStartCommand": [
+    "bash",
+    ".devcontainer/post-start.sh"
+  ],
   "remoteUser": "vscode",
   "containerEnv": {
     "UV_PROJECT_ENVIRONMENT": "/workspaces/infrastructure/.venv-container"
-  },
-  "remoteEnv": {
-    "PATH": "/home/vscode/.local/bin:/home/vscode/go/bin:${containerEnv:PATH}",
-    "SSH_AUTH_SOCK": "/home/vscode/.1password/agent.sock"
   },
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly,type=bind",
