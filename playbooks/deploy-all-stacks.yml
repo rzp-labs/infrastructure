@@ -37,21 +37,6 @@
       community.docker.docker_compose_v2:
         project_src: "{{ stacks_dir }}/{{ item }}"
         state: present
+        pull: "always"
       loop: "{{ stacks }}"
       register: deploy_results
-      failed_when: >
-        deploy_results is failed or (deploy_results.results | selectattr('failed', 'defined') | selectattr('failed') | list | length > 0)
-    - name: Restore previous Compose files (on failure)
-      block:
-        - name: Restore backup if deployment failed
-          ansible.builtin.unarchive:
-            src: "{{ backup_dir }}/compose_backup_{{ compose_backup_suffix }}.tar.gz"
-            dest: /
-            remote_src: true
-          register: restore_result
-          changed_when: restore_result.changed | default(false)
-          failed_when: restore_result.failed | default(false)
-      rescue:
-        - name: Log failure during restore
-          ansible.builtin.debug:
-            msg: "⚠️ Failed to restore previous Compose files — manual recovery may be required."
