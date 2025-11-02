@@ -2,7 +2,18 @@
 
 This file provides Infrastructure-as-Code specific guidance for Claude Code when working in this submodule.
 
-**For general project guidance, see the parent repository's CLAUDE.md and AGENTS.md files.**
+This project uses a shared context file (`AGENTS.md`) for common project guidelines. Please refer to it for information on build commands, code style, and design philosophy.
+
+This file is reserved for Claude Code-specific instructions.
+
+# import the following files (using the `@` syntax):
+
+- @AGENTS.md
+- @../AGENTS.md
+- @../CLAUDE.md
+- @../DISCOVERIES.md
+- @../ai_context/IMPLEMENTATION_PHILOSOPHY.md
+- @../ai_context/MODULAR_DESIGN_PHILOSOPHY.md
 
 ## Project Overview
 
@@ -17,19 +28,26 @@ Homelab Infrastructure-as-Code using Ansible to deploy Docker Compose stacks to 
 
 ## Essential Commands
 
+**Pure Delegation Architecture**: Infrastructure follows workspace-wide standard Makefile targets.
+
 ```bash
-# Initial setup
-make setup          # Install Python deps + Ansible collections
+# Standard targets (Pure Delegation pattern)
+make install        # Install Python deps + Ansible collections
+make check          # Run linting (YAML + Ansible + shell scripts)
+make test           # Validate Ansible playbooks and configuration
+
+# Backward-compatible aliases
+make setup          # Alias for install
+make lint           # Alias for check
+
+# Connectivity and deployment
 make ping           # Test VM connectivity
-
-# Linting
-make lint           # Check YAML, Ansible, shell scripts
-make format         # Auto-format YAML and shell scripts
-
-# Deployment
-make install-docker # First-time Docker installation on VM
 make deploy stack=<name>  # Deploy single stack
-make deploy-all     # Deploy all stacks via root orchestrator
+make check-deploy   # Validate deployment configuration
+
+# Development
+make format         # Auto-format YAML and shell scripts
+make clean          # Remove temporary files
 ```
 
 ## Architecture Patterns
@@ -136,7 +154,7 @@ uv run ansible-playbook playbooks/deploy-stack.yml
 - `ansible.posix` - Synchronize module for rsync
 - `geerlingguy.docker` - Docker installation role
 
-Install with: `make setup`
+Install with: `make install` (or `make setup` - backward-compatible alias)
 
 ## Linting
 
@@ -147,4 +165,4 @@ Configured tools:
 - **shfmt** - Shell script formatting
 - **EditorConfig** - Editor consistency
 
-Run via `make lint` or `make format`
+Run via `make check` (or `make lint` - backward-compatible alias) for linting, `make format` for auto-formatting

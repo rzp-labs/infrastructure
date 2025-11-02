@@ -22,13 +22,13 @@ Infrastructure is a **standalone project** that lives as a git submodule within 
 
 - **Independent version control** - Has its own git repository and history
 - **Own dependencies** - Has its own `pyproject.toml` managed with `uv`
-- **Own virtual environment** - Uses local `.venv/` (managed by `uv`)
+- **Own virtual environment** - Uses local `.venv/` (NOT parent workspace's `.venv`)
 - **Clean separation** - No code imports from Amplifier (only follows its patterns)
 - **Development environment** - Uses parent workspace's DevContainer configuration
 
 ### Virtual Environment Isolation
 
-**CRITICAL**: Always run commands from the infrastructure directory itself, not from the parent workspace:
+**CRITICAL**: Always run commands from the infrastructure directory itself, not from the parent workspace.
 
 ```bash
 cd infrastructure
@@ -40,23 +40,46 @@ make deploy stack=traefik
 
 **Prerequisites**: `uv` for Python, `yamlfmt` and `shfmt` for formatting (provided by parent DevContainer)
 
-### Setup
+**Pure Delegation Architecture**: Infrastructure follows workspace-wide standard Makefile targets (install, check, test) with backward-compatible aliases (setup, lint).
+
 ```bash
-make setup          # Install Python deps + Ansible collections
+# Standard targets (Pure Delegation pattern)
+make install        # Install Python deps + Ansible collections
+make check          # Run yamllint + ansible-lint
+make test           # Validate Ansible playbooks and configuration
+
+# Backward-compatible aliases
+make setup          # Alias for install
+make lint           # Alias for check
+```
+
+**Add dependencies**:
+```bash
+cd infrastructure  # Must be in submodule directory
+uv add <package>           # Production dependency
+uv add --dev <package>     # Development dependency
+```
+
+### Installation
+```bash
+make install        # Install Python deps + Ansible collections (or use 'make setup')
 ```
 
 ### Code Quality
 ```bash
-make lint           # Run yamllint + ansible-lint + shell/yaml linting
+make check          # Run yamllint + ansible-lint (or use 'make lint')
 make format         # Auto-format YAML and shell scripts
+```
+
+### Testing
+```bash
+make test           # Validate Ansible playbooks and configuration
 ```
 
 ### Deployment
 ```bash
 make ping                          # Test SSH connectivity to VM
-make install-docker                # Install Docker on the VM (first time)
 make deploy stack=<stack-name>     # Deploy single stack
-make deploy-all                    # Deploy all stacks via root orchestrator
 make check-deploy                  # Validate deployment configuration
 ```
 
@@ -69,31 +92,45 @@ uv run ansible homelab -a "docker logs traefik"   # View logs
 
 ## Code Style Guidelines
 
-### YAML
-- **Indentation**: 2 spaces
-- **Line length**: 120 characters (yamlfmt default)
-- **Quotes**: Prefer double quotes for strings
-- **Linting**: yamllint + ansible-lint
-- **Formatting**: yamlfmt (auto-formats on `make format`)
-
-### Shell Scripts
-- **Indentation**: 2 spaces
-- **Style**: Simplified, compact, space redirects (`-i 2 -ci -sr`)
-- **Formatting**: shfmt (auto-formats on `make format`)
-
-### Python
-- **Python version**: 3.12+
+- **Line length**: 120 characters (configured across all tools)
+- **Python version**: 3.12+ required
 - **Type hints**: Not currently required (tool scripts, not library code)
-- **Linting**: ruff (configured in pyproject.toml)
-- **Line length**: 120 characters
+- **Idempotency**: All Ansible playbooks must be idempotent (safe to run multiple times)
+- **Task naming**: Clear, descriptive task names for Ansible playbooks
+- **Error handling**: Comprehensive logging for debugging deployment issues
 
-### Ansible
-- **Best practices**: Enforced by ansible-lint
-- **Idempotency**: All playbooks must be idempotent (safe to run multiple times)
-- **Task naming**: Clear, descriptive task names
-- **Privilege escalation**: Configured globally in ansible.cfg
+## Formatting Guidelines
 
-## Project Structure
+- **Tool**: Multiple formatters for different file types
+- **YAML**: yamlfmt (2-space indentation, 120-char lines)
+- **Shell scripts**: shfmt (2-space indentation, `-i 2 -ci -sr` style)
+- **Ansible**: ansible-lint (best practices enforcement)
+- **Line endings**: LF (Unix style)
+- **EOF**: All files must end with newline
+
+## Configuration Files
+
+**pyproject.toml** - Single source of truth for:
+- Python dependencies (managed by `uv`)
+- Ruff configuration
+- Project metadata
+
+**ansible.cfg** - Ansible configuration:
+- Inventory location
+- Privilege escalation settings
+- Python interpreter discovery
+- Host key checking
+
+**requirements.yml** - Ansible collections and roles:
+- community.docker
+- ansible.posix
+- geerlingguy.docker
+
+**Makefile** - Standard commands that reference configuration files
+
+**Never duplicate configuration** - Read from authoritative files when needed.
+
+## File Structure
 
 ```
 infrastructure/
@@ -269,3 +306,28 @@ Since this is a submodule:
 - **Update parent after infrastructure changes**: `cd .. && git add infrastructure && git commit -m "Update infrastructure submodule"`
 
 See the parent workspace's `docs/WORKSPACE_PATTERN.md` for complete guidance on working with submodules in the Amplifier workspace pattern.
+
+## Philosophy Alignment
+
+### Ruthless Simplicity
+
+- **Declarative over imperative** - Use Ansible's declarative state management
+- **Idempotent playbooks** - Safe to run repeatedly without side effects
+- **Minimal dependencies** - Only essential Ansible collections
+- **Direct integration** - Ansible modules used as intended
+- **Security-first** - Docker Socket Proxy prevents direct socket access
+
+### Infrastructure as Code Best Practices
+
+- **Version control everything** - All configurations tracked in git
+- **Immutable deployments** - Always pull latest images (`pull: always`)
+- **Configuration separation** - `.env` files never committed
+- **Root orchestrator pattern** - Shared resources, independent stacks
+- **Clear documentation** - Architecture patterns explicitly documented
+
+## Related Documentation
+
+- **[README.md](README.md)** - Project overview and quick start
+- **[CLAUDE.md](CLAUDE.md)** - Claude Code specific guidance
+- **[stacks/README.md](stacks/README.md)** - Stack documentation and patterns
+- **Parent workspace**: This project is developed using the [Amplifier](https://github.com/microsoft/amplifier) workspace pattern. See parent workspace `AGENTS.md` and `CLAUDE.md` for broader context on development philosophy and patterns.
