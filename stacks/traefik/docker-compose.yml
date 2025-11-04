@@ -9,16 +9,19 @@ services:
     command:
       - --configFile=/traefik.yml
       - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.propagationtimeout=600s
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.pollinginterval=10s
       - --log.level=DEBUG
     networks:
       - socket-proxy
-      - proxy
+      - traefik
     ports:
       - 8080:80
       - 8443:443
     environment:
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
       - ACME_EMAIL=${ACME_EMAIL}
+      - DOMAIN=${DOMAIN}
       - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -44,5 +47,6 @@ networks:
   socket-proxy:
     name: socket-proxy
     external: true
-  proxy:
+  traefik:
+    name: traefik
     external: true

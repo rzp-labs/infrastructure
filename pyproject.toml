@@ -13,8 +13,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = []
 
-[tool.uv]
-dev-dependencies = []
+[dependency-groups]
+dev = []
 
 [tool.ruff]
 line-length = 120

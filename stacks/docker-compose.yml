@@ -5,13 +5,12 @@
 
 # Shared networks owned by root compose
 networks:
-  default:
-    external: true
-  traefik:
-    external: true
+  default: {}
+  traefik: {}
   socket-proxy:
     internal: true
 
 include:
   - docker-socket-proxy/docker-compose.yml
   - traefik/docker-compose.yml
+  - zitadel/docker-compose.yml

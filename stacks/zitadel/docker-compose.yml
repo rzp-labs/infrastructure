@@ -1,0 +1,64 @@
+---
+services:
+  zitadel-db:
+    image: postgres:15
+    container_name: zitadel-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${ZITADEL_DB_USER:-zitadel}
+      - POSTGRES_PASSWORD=${ZITADEL_DB_PASSWORD:-change-me}
+      - POSTGRES_DB=${ZITADEL_DB_NAME:-zitadel}
+    volumes:
+      - zitadel-db-data:/var/lib/postgresql/data
+    networks:
+      - zitadel
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:latest
+    container_name: zitadel
+    restart: unless-stopped
+    depends_on:
+      - zitadel-db
+    command:
+      - start
+      - --masterkeyFromEnv
+      - --tlsMode
+      - disabled
+    environment:
+      - ZITADEL_MASTERKEY=${ZITADEL_MASTERKEY:-replace-with-32-byte-hex}
+      - ZITADEL_EXTERNAL_DOMAIN=${ZITADEL_DOMAIN:-auth.example.com}
+      - ZITADEL_EXTERNAL_PORT=443
+      - ZITADEL_EXTERNAL_SECURE=true
+      - ZITADEL_DATABASE_POSTGRES_HOST=zitadel-db
+      - ZITADEL_DATABASE_POSTGRES_PORT=5432
+      - ZITADEL_DATABASE_POSTGRES_DATABASE=${ZITADEL_DB_NAME:-zitadel}
+      - ZITADEL_DATABASE_POSTGRES_SSL_MODE=${ZITADEL_DB_SSL_MODE:-disable}
+      - ZITADEL_DATABASE_POSTGRES_USER_USERNAME=${ZITADEL_DB_USER:-zitadel}
+      - ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=${ZITADEL_DB_PASSWORD:-change-me}
+      - ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=${ZITADEL_DB_SSL_MODE:-disable}
+      - ZITADEL_FIRSTINSTANCE_ORG_NAME=${ZITADEL_ORG_NAME}
+      - ZITADEL_FIRSTINSTANCE_PROJECT_NAME=${ZITADEL_PROJECT_NAME}
+      - ZITADEL_FIRSTINSTANCE_MACHINE_KEY_NAME=${ZITADEL_MACHINE_KEY_NAME}
+      - ZITADEL_FIRSTINSTANCE_MACHINE_KEY_EXPIRATION_DATE=${ZITADEL_MACHINE_KEY_EXPIRATION}
+    volumes:
+      - zitadel-config:/zitadel
+    networks:
+      - zitadel
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.zitadel.rule=Host(`auth.${ZITADEL_DOMAIN}`)"
+      - "traefik.http.routers.zitadel.entrypoints=https"
+      - "traefik.http.routers.zitadel.tls=true"
+      - "traefik.http.routers.zitadel.tls.certresolver=cloudflare"
+      - "traefik.http.services.zitadel.loadbalancer.server.port=8080"
+
+volumes:
+  zitadel-db-data:
+  zitadel-config:
+
+networks:
+  zitadel:
+    internal: true
+  traefik:
+    external: true

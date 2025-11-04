@@ -5,7 +5,9 @@ services:
     container_name: docker-socket-proxy
     restart: unless-stopped
     networks:
-      - socket-proxy
+      socket-proxy:
+        aliases:
+          - socket-proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -28,8 +30,11 @@ services:
       - SWARM=0
       - SYSTEM=0
       - VOLUMES=0
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
 
 networks:
   socket-proxy:
     name: socket-proxy
-    internal: true
+    external: true

@@ -5,15 +5,38 @@
   gather_facts: false
 
   vars:
-    stacks_src_dir: "../stacks"
+    stacks_src_dir: "{{ ([playbook_dir, '..', 'stacks'] | path_join) | realpath }}"
     stacks_dir: /opt/stacks
     backup_dir: /opt/stack_backups
     compose_backup_suffix: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
-    stacks:
-      - docker-socket-proxy
-      - traefik
 
   tasks:
+    - name: Discover stack compose files
+      ansible.builtin.find:
+        paths: "{{ stacks_src_dir }}"
+        patterns: docker-compose.yml
+        recurse: true
+        file_type: file
+      register: stack_compose_matches
+      delegate_to: localhost
+      become: false
+      changed_when: false
+
+    - name: Determine stacks to deploy
+      ansible.builtin.set_fact:
+        stacks: "{{ stack_compose_matches.files
+                    | map(attribute='path')
+                    | map('regex_replace', '/docker-compose.yml$', '')
+                    | map('basename')
+                    | reject('equalto', 'stacks')
+                    | list
+                    | sort }}"
+
+    - name: Ensure stacks were discovered
+      ansible.builtin.fail:
+        msg: "No stacks found under {{ stacks_src_dir }}"
+      when: stacks | length == 0
+
     - name: Ensure stack and backup directories exist
       ansible.builtin.file:
         path: "{{ item }}"
@@ -40,6 +63,19 @@
     - name: Create proxy network
       community.docker.docker_network:
         name: proxy
+        internal: false
+        state: present
+
+    - name: Ensure traefik network exists
+      community.docker.docker_network:
+        name: traefik
+        internal: false
+        state: present
+
+    - name: Ensure socket-proxy network exists
+      community.docker.docker_network:
+        name: socket-proxy
+        internal: true
         state: present
 
     - name: Set permissions on acme.json for traefik
@@ -58,6 +94,14 @@
       register: backup_result
       changed_when: backup_result.dest is defined
       failed_when: backup_result.failed is defined and backup_result.failed
+
+    - name: Stop and remove all containers for clean network recreation
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dir }}/{{ item }}"
+        state: absent
+        remove_orphans: true
+      loop: "{{ stacks }}"
+      when: item in ['docker-socket-proxy', 'traefik']
 
     - name: Deploy all stacks with Docker Compose
       community.docker.docker_compose_v2:

@@ -81,6 +81,10 @@ deploy: ## Deploy a stack (usage: make deploy stack=<stack-name>)
 	@echo "Deploying stack: $(stack)"
 	uv run ansible-playbook playbooks/deploy-stack.yml -e "stack_name=$(stack)"
 
+deploy-all: ## Deploy all stacks using root orchestrator
+	@echo "Deploying all stacks..."
+	uv run ansible-playbook playbooks/deploy-all-stacks.yml
+
 check-deploy: ## Validate deployment configuration (dry-run)
 	@echo "Validating deployment configuration..."
 	uv run ansible-playbook playbooks/deploy-stack.yml --check
