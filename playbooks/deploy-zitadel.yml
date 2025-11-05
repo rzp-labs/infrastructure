@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/schemas/main/f/ansible-playbook.json
+---
+- name: Deploy Zitadel stack to homelab
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+    stack_name: "zitadel"
+    stacks_src_dir: "../stacks"
+    stacks_dest_dir: "/opt/stacks"
+    zitadel_init_marker_path: "{{ stacks_dest_dir }}/zitadel/.zitadel_initialized"
+
+  tasks:
+    - name: Run shared stack deployment tasks
+      ansible.builtin.include_tasks: tasks/deploy-stack-base.yml
+
+    - name: Ensure traefik network exists for Zitadel routing
+      community.docker.docker_network:
+        name: traefik
+        internal: false
+        state: present
+
+    - name: Run Zitadel stack-specific tasks
+      ansible.builtin.include_tasks: tasks/stacks/zitadel.yml
+
+    - name: Deploy Zitadel stack with Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dest_dir }}/{{ stack_name }}"
+        state: present
+        pull: "always"
+      register: zitadel_deploy
+
+    - name: Show Zitadel deployment result
+      ansible.builtin.debug:
+        var: zitadel_deploy

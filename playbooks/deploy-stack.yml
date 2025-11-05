@@ -7,63 +7,23 @@
     stack_name: "{{ stack | default('') }}"
     stacks_src_dir: "../stacks"
     stacks_dest_dir: "/opt/stacks"
+    zitadel_init_marker_path: "{{ stacks_dest_dir }}/zitadel/.zitadel_initialized"
 
   tasks:
-    - name: Validate stack name is provided
-      ansible.builtin.assert:
-        that:
-          - stack_name != ''
-        fail_msg: "You must provide a stack name with -e stack=<stack_name>"
+    - name: Run shared stack deployment tasks
+      ansible.builtin.include_tasks: tasks/deploy-stack-base.yml
 
-    - name: Create stacks directory on remote host
-      ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Create stack directory
-      ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/{{ stack_name }}"
-        state: directory
-        mode: '0755'
-
-    - name: Copy stack files to remote host
-      ansible.builtin.copy:
-        src: "{{ stacks_src_dir }}/{{ stack_name }}/"
-        dest: "{{ stacks_dest_dir }}/{{ stack_name }}/"
-        mode: preserve
-      register: copy_result
-      changed_when: copy_result.changed
-
-    - name: Check if .env file exists on remote
+    - name: Check for stack-specific tasks
       ansible.builtin.stat:
-        path: "{{ stacks_dest_dir }}/{{ stack_name }}/.env"
-      register: env_file
+        path: "{{ playbook_dir }}/tasks/stacks/{{ stack_name }}.yml"
+      register: stack_specific_tasks
+      delegate_to: localhost
+      become: false
+      run_once: true
 
-    - name: Warn if .env doesn't exist
-      ansible.builtin.debug:
-        msg: "WARNING: .env file not found at {{ stacks_dest_dir }}/{{ stack_name }}/.env - copy .env.example and configure it"
-      when: not env_file.stat.exists
-
-    - name: Create socket-proxy network if deploying docker-socket-proxy
-      community.docker.docker_network:
-        name: socket-proxy
-        internal: true
-        state: present
-      when: stack_name == 'docker-socket-proxy'
-
-    - name: Create proxy network if deploying traefik
-      community.docker.docker_network:
-        name: proxy
-        state: present
-      when: stack_name == 'traefik'
-
-    - name: Set permissions on acme.json for traefik
-      ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/{{ stack_name }}/acme.json"
-        state: touch
-        mode: '0600'
-      when: stack_name == 'traefik'
+    - name: Run stack-specific tasks
+      ansible.builtin.include_tasks: "tasks/stacks/{{ stack_name }}.yml"
+      when: stack_specific_tasks.stat.exists
 
     - name: Deploy stack with docker-compose
       community.docker.docker_compose_v2:

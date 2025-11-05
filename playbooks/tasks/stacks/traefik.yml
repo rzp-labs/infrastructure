@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/schemas/main/f/ansible-tasks.json
+---
+- name: Ensure proxy network exists for Traefik
+  community.docker.docker_network:
+    name: proxy
+    state: present
+
+- name: Ensure acme.json exists with correct permissions
+  ansible.builtin.file:
+    path: "{{ stacks_dest_dir }}/{{ stack_name }}/acme.json"
+    state: touch
+    mode: '0600'

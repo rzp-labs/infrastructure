@@ -1,7 +1,10 @@
 # Infrastructure Makefile
 # Pure Delegation Architecture: Provides standard targets (install, check, test)
 
-.PHONY: help install check test setup lint format ping deploy check-deploy clean
+STACK_DIRS := $(shell find stacks -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+DEPLOY_STACK_TARGETS := $(addprefix deploy-,$(STACK_DIRS))
+
+.PHONY: help install check test setup lint format ping deploy check-deploy clean $(DEPLOY_STACK_TARGETS)
 
 # Default target
 help: ## Show this help message
@@ -19,6 +22,7 @@ help: ## Show this help message
 	@echo "Deployment:"
 	@echo "  make ping            Test VM connectivity"
 	@echo "  make deploy          Deploy a stack (use: make deploy stack=<name>)"
+	@echo "  make deploy-<stack>  Deploy a stack using per-stack shortcut (e.g., deploy-traefik)"
 	@echo "  make check-deploy    Validate deployment configuration"
 	@echo ""
 	@echo "Development:"
@@ -84,6 +88,9 @@ deploy: ## Deploy a stack (usage: make deploy stack=<stack-name>)
 deploy-all: ## Deploy all stacks using root orchestrator
 	@echo "Deploying all stacks..."
 	uv run ansible-playbook playbooks/deploy-all-stacks.yml
+
+$(DEPLOY_STACK_TARGETS): ## Deploy specific stack via shortcut target
+	@$(MAKE) deploy stack=$(patsubst deploy-%,%,$@)
 
 check-deploy: ## Validate deployment configuration (dry-run)
 	@echo "Validating deployment configuration..."

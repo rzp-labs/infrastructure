@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/schemas/main/f/ansible-tasks.json
+---
+- name: Validate stack name is provided
+  ansible.builtin.assert:
+    that:
+      - stack_name != ''
+    fail_msg: "You must provide a stack name with -e stack=<stack_name>"
+
+- name: Create stacks directory on remote host
+  ansible.builtin.file:
+    path: "{{ stacks_dest_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create stack directory
+  ansible.builtin.file:
+    path: "{{ stacks_dest_dir }}/{{ stack_name }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy stack files to remote host
+  ansible.builtin.copy:
+    src: "{{ stacks_src_dir }}/{{ stack_name }}/"
+    dest: "{{ stacks_dest_dir }}/{{ stack_name }}/"
+    mode: preserve
+  register: copy_result
+  changed_when: copy_result.changed
+
+- name: Check if .env file exists on remote
+  ansible.builtin.stat:
+    path: "{{ stacks_dest_dir }}/{{ stack_name }}/.env"
+  register: env_file
+
+- name: Warn if .env doesn't exist
+  ansible.builtin.debug:
+    msg: "WARNING: .env file not found at {{ stacks_dest_dir }}/{{ stack_name }}/.env - copy .env.example and configure it"
+  when: not env_file.stat.exists

@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/schemas/main/f/ansible-playbook.json
+---
+- name: Destroy Zitadel stack (destructive)
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+    stack_name: "zitadel"
+    stacks_dest_dir: "/opt/stacks"
+    zitadel_compose_dir: "{{ stacks_dest_dir }}/{{ stack_name }}"
+    zitadel_init_marker_path: "{{ stacks_dest_dir }}/{{ stack_name }}/.zitadel_initialized"
+
+  tasks:
+    - name: Confirm destructive destroy
+      ansible.builtin.pause:
+        prompt: |
+          You are about to DESTROY all Zitadel data by removing its Docker volumes.
+          Type "destroy" to continue or anything else to abort.
+      register: confirm_destroy
+
+    - name: Abort if confirmation not provided
+      ansible.builtin.fail:
+        msg: "Zitadel destroy aborted by user"
+      when: confirm_destroy.user_input | lower != "destroy"
+
+    - name: Stop Zitadel stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ zitadel_compose_dir }}"
+        state: absent
+        remove_orphans: true
+
+    - name: Remove Zitadel volumes
+      community.docker.docker_volume:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ stack_name }}_zitadel-db-data"
+        - "{{ stack_name }}_zitadel-config"
+
+    - name: Remove Zitadel initialization marker
+      ansible.builtin.file:
+        path: "{{ zitadel_init_marker_path }}"
+        state: absent

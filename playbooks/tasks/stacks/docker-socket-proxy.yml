@@ -1,0 +1,6 @@
+---
+- name: Ensure socket-proxy network exists
+  community.docker.docker_network:
+    name: socket-proxy
+    internal: true
+    state: present
