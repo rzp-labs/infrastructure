@@ -5,9 +5,12 @@ STACK_DIRS := $(shell find stacks -mindepth 1 -maxdepth 1 -type d -exec basename
 DEPLOY_STACK_TARGETS := $(addprefix deploy-,$(STACK_DIRS))
 DOCKER_DEPLOY_STACK_TARGETS := $(addprefix docker-deploy-,$(STACK_DIRS))
 
-.PHONY: help install check test setup lint format ping deploy docker-deploy check-deploy clean destroy-zitadel docker-install docker-destroy-all docker-restart-all docker-stop-all docker-start-all docker-doctor docker-deploy-all $(DEPLOY_STACK_TARGETS) $(DOCKER_DEPLOY_STACK_TARGETS)
-.PHONY: help install check test setup lint format ping deploy check-deploy clean destroy \
-        bootstrap test-molecule test-quality test-standards report clean-all $(DEPLOY_STACK_TARGETS)
+.PHONY: help install check test setup lint format ping deploy docker-deploy\
+ 				 check-deploy clean destroy-zitadel docker-install docker-destroy-all\
+				 docker-restart-all docker-stop-all docker-start-all docker-doctor\
+				 docker-deploy-all $(DEPLOY_STACK_TARGETS) $(DOCKER_DEPLOY_STACK_TARGETS)\
+				 check-deploy clean destroy bootstrap test-molecule test-quality test-standards\
+				 report clean-all $(DEPLOY_STACK_TARGETS)
 
 # Default target
 help: ## Show this help message
