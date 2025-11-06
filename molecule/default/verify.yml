@@ -1,0 +1,42 @@
+---
+# Molecule verify playbook
+# Validates that the infrastructure was deployed correctly
+
+- name: Verify
+  hosts: all
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Verify test directory exists
+      ansible.builtin.stat:
+        path: /opt/test
+      register: test_dir
+      failed_when: not test_dir.stat.exists or not test_dir.stat.isdir
+
+    - name: Verify test file exists
+      ansible.builtin.stat:
+        path: /opt/test/deployment.txt
+      register: test_file
+      failed_when: not test_file.stat.exists
+
+    - name: Verify test file content
+      ansible.builtin.command:
+        cmd: cat /opt/test/deployment.txt
+      register: file_content
+      changed_when: false
+      failed_when: "'Test infrastructure' not in file_content.stdout"
+
+    - name: Verify Python is installed
+      ansible.builtin.command:
+        cmd: python3 --version
+      register: python_version
+      changed_when: false
+      failed_when: python_version.rc != 0
+
+    - name: Display verification results
+      ansible.builtin.debug:
+        msg:
+          - "✓ Test directory exists"
+          - "✓ Test file exists with correct content"
+          - "✓ Python is installed: {{ python_version.stdout }}"

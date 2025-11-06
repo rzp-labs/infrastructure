@@ -6,6 +6,8 @@ DEPLOY_STACK_TARGETS := $(addprefix deploy-,$(STACK_DIRS))
 DOCKER_DEPLOY_STACK_TARGETS := $(addprefix docker-deploy-,$(STACK_DIRS))
 
 .PHONY: help install check test setup lint format ping deploy docker-deploy check-deploy clean destroy-zitadel docker-install docker-destroy-all docker-restart-all docker-stop-all docker-start-all docker-doctor docker-deploy-all $(DEPLOY_STACK_TARGETS) $(DOCKER_DEPLOY_STACK_TARGETS)
+.PHONY: help install check test setup lint format ping deploy check-deploy clean destroy \
+        bootstrap test-molecule test-quality test-standards report clean-all $(DEPLOY_STACK_TARGETS)
 
 # Default target
 help: ## Show this help message
@@ -14,11 +16,19 @@ help: ## Show this help message
 	@echo "Standard targets (Pure Delegation):"
 	@echo "  make install         Install dependencies (Ansible + collections)"
 	@echo "  make check           Run linting (YAML + Ansible + shell)"
-	@echo "  make test            Validate Ansible playbooks and configuration"
+	@echo "  make test            Run full test suite (Molecule + quality checks)"
 	@echo ""
 	@echo "Backward-compatible aliases:"
 	@echo "  make setup           Alias for install"
 	@echo "  make lint            Alias for check"
+	@echo ""
+	@echo "Testing harness:"
+	@echo "  make bootstrap       Bootstrap testing environment (Docker + deps)"
+	@echo "  make test-molecule   Run Molecule tests with idempotence checks"
+	@echo "  make test-quality    Run IaC quality analysis"
+	@echo "  make test-standards  Run custom standards checks"
+	@echo "  make report          Generate quality reports (JSON + Markdown)"
+	@echo "  make destroy         Clean up test resources (containers, networks)"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make ping            Test VM connectivity"
@@ -37,6 +47,7 @@ help: ## Show this help message
 	@echo "Development:"
 	@echo "  make format          Auto-format YAML and shell scripts"
 	@echo "  make clean           Remove temporary files"
+	@echo "  make clean-all       Remove all generated files and test artifacts"
 
 ##
 ## Standard Targets (Pure Delegation Architecture)
@@ -60,14 +71,11 @@ check: ## Run linting (YAML + Ansible + shell scripts)
 	@echo ""
 	@echo "✅ All checks passed!"
 
-test: ## Validate Ansible playbooks and configuration
-	@echo "Validating Ansible playbooks..."
-	@for playbook in playbooks/*.yml; do \
-		echo "Checking $$playbook..."; \
-		uv run ansible-playbook "$$playbook" --syntax-check --skip-tags=never || true; \
-	done
+test: check test-molecule test-quality ## Run full test suite (linting + Molecule + quality)
 	@echo ""
-	@echo "✅ Validation complete!"
+	@echo "✅ All tests passed!"
+	@echo ""
+	@$(MAKE) report
 
 ##
 ## Backward-Compatible Aliases
@@ -156,3 +164,48 @@ clean: ## Remove temporary files
 	@find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✅ Cleanup complete!"
+
+##
+## Testing Harness Targets
+##
+
+bootstrap: ## Bootstrap testing environment (installs Docker if needed)
+	@echo "Bootstrapping testing environment..."
+	@bash scripts/bootstrap.sh
+
+test-molecule: ## Run Molecule tests with idempotence checks
+	@echo "Running Molecule tests..."
+	@bash scripts/run_molecule.sh default test
+
+test-quality: ## Run IaC quality analysis
+	@echo "Running quality analysis..."
+	@uv run python scripts/analyze_iac.py --root . --output tests/artifacts/quality_report.json
+
+test-standards: test-quality ## Run custom standards checks (alias for test-quality)
+
+report: ## Generate quality reports (JSON + Markdown)
+	@echo "Generating quality reports..."
+	@if [ -f tests/artifacts/quality_report.json ]; then \
+		uv run python scripts/analyze_iac.py --root . --format markdown > docs/quality_report.md 2>/dev/null || true; \
+		echo "📊 Reports available:"; \
+		echo "   - tests/artifacts/quality_report.json"; \
+		echo "   - docs/quality_report.md"; \
+	else \
+		echo "⚠️  No quality report found. Run 'make test-quality' first."; \
+	fi
+
+destroy: ## Clean up all test resources (containers, networks, volumes)
+	@echo "Destroying test resources..."
+	@uv run molecule destroy --all 2>/dev/null || true
+	@docker ps -a --filter "label=molecule" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
+	@docker network ls --filter "label=molecule" --format "{{.ID}}" | xargs -r docker network rm 2>/dev/null || true
+	@docker volume ls --filter "label=molecule" --format "{{.Name}}" | xargs -r docker volume rm 2>/dev/null || true
+	@docker network ls --filter "name=molecule" --format "{{.ID}}" | xargs -r docker network rm 2>/dev/null || true
+	@echo "✅ All test resources destroyed"
+
+clean-all: clean destroy ## Remove all generated files and test artifacts
+	@echo "Removing test artifacts..."
+	@rm -rf tests/artifacts/* 2>/dev/null || true
+	@rm -rf .molecule 2>/dev/null || true
+	@rm -rf molecule/*/.molecule 2>/dev/null || true
+	@echo "✅ All generated files removed"

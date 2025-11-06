@@ -1,0 +1,42 @@
+---
+# Molecule converge playbook
+# Tests basic infrastructure setup without connecting to remote host
+
+- name: Converge
+  hosts: all
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install basic requirements
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+
+    - name: Create test directory
+      ansible.builtin.file:
+        path: /opt/test
+        state: directory
+        mode: "0755"
+
+    - name: Create test file
+      ansible.builtin.copy:
+        content: "Test infrastructure deployment\n"
+        dest: /opt/test/deployment.txt
+        mode: "0644"
+
+    - name: Verify test file content
+      ansible.builtin.slurp:
+        src: /opt/test/deployment.txt
+      register: test_file
+      failed_when: "'Test infrastructure' not in (test_file.content | b64decode)"

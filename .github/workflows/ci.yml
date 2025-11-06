@@ -1,0 +1,289 @@
+---
+name: Infrastructure CI
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      iac_targets:
+        description: "Specific targets to test (comma-separated, e.g., playbooks,stacks)"
+        required: false
+        default: "all"
+      iac_images:
+        description: "Docker images to test (comma-separated)"
+        required: false
+        default: "debian:13-slim"
+      iac_fast:
+        description: "Fast mode (skip slow tests)"
+        required: false
+        type: boolean
+        default: false
+      iac_strict:
+        description: "Strict mode (fail on warnings)"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  UV_CACHE_DIR: ${{ github.workspace }}/.cache/uv
+  PYTHON_VERSION: "3.12"
+  IAC_TARGETS: ${{ github.event.inputs.iac_targets || 'all' }}
+  IAC_IMAGES: ${{ github.event.inputs.iac_images || 'debian:13-slim' }}
+  IAC_FAST: ${{ github.event.inputs.iac_fast || 'false' }}
+  IAC_STRICT: ${{ github.event.inputs.iac_strict || 'false' }}
+
+jobs:
+  # Detect changed files to enable selective execution
+  detect-changes:
+    name: Detect Changed Files
+    runs-on: ubuntu-latest
+    outputs:
+      has_yaml: ${{ steps.changes.outputs.has_yaml }}
+      has_python: ${{ steps.changes.outputs.has_python }}
+      has_playbooks: ${{ steps.changes.outputs.has_playbooks }}
+      has_stacks: ${{ steps.changes.outputs.has_stacks }}
+      total_files: ${{ steps.changes.outputs.total_files }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Detect changed files
+        id: changes
+        run: |
+          uv run python scripts/changed_files.py \
+            --base origin/${{ github.base_ref || 'main' }} \
+            --format github >> "$GITHUB_OUTPUT"
+
+  # Setup and install dependencies
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      - name: Cache Ansible collections
+        uses: actions/cache@v4
+        with:
+          path: ~/.ansible/collections
+          key: ansible-collections-${{ hashFiles('**/requirements.yml') }}
+          restore-keys: |
+            ansible-collections-
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+          uv run ansible-galaxy collection install -r requirements.yml
+
+      - name: Generate environment report
+        run: |
+          mkdir -p tests/artifacts
+          uv run python scripts/analyze_iac.py --root . --output tests/artifacts/env_report.json
+
+      - name: Upload environment report
+        uses: actions/upload-artifact@v4
+        with:
+          name: environment-report
+          path: tests/artifacts/env_report.json
+          retention-days: 7
+
+  # Linting checks
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    needs: [setup, detect-changes]
+    if: needs.detect-changes.outputs.has_yaml == '1' || needs.detect-changes.outputs.has_python == '1'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run yamllint
+        if: needs.detect-changes.outputs.has_yaml == '1'
+        run: uv run yamllint .
+
+      - name: Run ansible-lint
+        if: needs.detect-changes.outputs.has_playbooks == '1'
+        run: uv run ansible-lint playbooks/
+
+      - name: Run ruff (Python)
+        if: needs.detect-changes.outputs.has_python == '1'
+        run: uv run ruff check .
+
+  # Molecule tests
+  molecule:
+    name: Molecule Tests
+    runs-on: ubuntu-latest
+    needs: [setup, detect-changes, lint]
+    if: |
+      needs.detect-changes.outputs.has_playbooks == '1' ||
+      needs.detect-changes.outputs.has_yaml == '1' ||
+      env.IAC_TARGETS == 'all'
+    strategy:
+      matrix:
+        scenario: [default]
+        image:
+          - "debian:13-slim"
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+          uv run ansible-galaxy collection install -r requirements.yml
+
+      - name: Install Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io jq
+          sudo systemctl start docker
+          sudo usermod -aG docker $USER
+
+      - name: Pull test image
+        run: docker pull ${{ matrix.image }}
+
+      - name: Run Molecule tests
+        env:
+          MOLECULE_IMAGE: ${{ matrix.image }}
+        run: |
+          bash scripts/run_molecule.sh ${{ matrix.scenario }} test
+
+      - name: Upload Molecule results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: molecule-results-${{ matrix.scenario }}-${{ strategy.job-index }}
+          path: tests/artifacts/molecule_results.json
+          retention-days: 30
+
+  # Quality analysis
+  quality:
+    name: Quality Analysis
+    runs-on: ubuntu-latest
+    needs: [setup, molecule]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run quality analysis
+        run: |
+          mkdir -p tests/artifacts docs
+          uv run python scripts/analyze_iac.py --root . --output tests/artifacts/quality_report.json
+          uv run python scripts/analyze_iac.py --root . --format markdown > docs/quality_report.md
+
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            tests/artifacts/quality_report.json
+            docs/quality_report.md
+          retention-days: 30
+
+      - name: Check quality scores
+        run: |
+          SCORE=$(jq -r '.scores.overall' tests/artifacts/quality_report.json)
+          echo "Overall quality score: $SCORE"
+          if (( $(echo "$SCORE < 80" | bc -l) )); then
+            echo "⚠️ Quality score below threshold (80)"
+            if [ "${{ env.IAC_STRICT }}" = "true" ]; then
+              echo "❌ Failing due to strict mode"
+              exit 1
+            fi
+          fi
+
+  # Cleanup job (always runs)
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [molecule, quality]
+    if: always()
+    steps:
+      - name: Cleanup Docker resources
+        run: |
+          docker ps -a --filter "label=molecule" --format "{{.ID}}" | xargs -r docker rm -f || true
+          docker network ls --filter "label=molecule" --format "{{.ID}}" | xargs -r docker network rm || true
+          docker volume ls --filter "label=molecule" --format "{{.Name}}" | xargs -r docker volume rm || true
