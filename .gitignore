@@ -105,6 +105,15 @@ tmp/
 temp/
 *.tmp
 
+# Molecule testing
+.molecule/
+molecule/*/.molecule/
+.cache/
+
+# Test artifacts
+tests/artifacts/
+!tests/artifacts/.gitkeep
+
 # Compressed files
 *.zip
 *.tar.gz
