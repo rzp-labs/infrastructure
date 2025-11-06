@@ -28,10 +28,53 @@
     fail_msg: "ZITADEL_MASTERKEY must be exactly 32 characters (generate with: openssl rand -base64 24)."
   no_log: true
 
+- name: Read Zitadel admin password from environment file
+  ansible.builtin.shell: |
+    set -a
+    . "{{ stacks_dest_dir }}/{{ stack_name }}/.env"
+    printf "%s" "$ZITADEL_ADMIN_PASSWORD"
+  args:
+    executable: /bin/bash
+  register: zitadel_admin_password_cmd
+  changed_when: false
+  no_log: true
+
+- name: Validate Zitadel admin password format
+  ansible.builtin.assert:
+    that:
+      - zitadel_admin_password_cmd.stdout | length >= 12
+      - zitadel_admin_password_cmd.stdout != 'ChangeMeNow!'
+    fail_msg: "ZITADEL_ADMIN_PASSWORD must be at least 12 characters and not the default placeholder."
+  no_log: true
+
 - name: Remove legacy Zitadel initialization marker
   ansible.builtin.file:
     path: "{{ stacks_dest_dir }}/{{ stack_name }}/.zitadel_initialized"
     state: absent
+
+- name: Ensure Zitadel config directory exists with open permissions
+  ansible.builtin.file:
+    path: "{{ stacks_dest_dir }}/{{ stack_name }}/config"
+    state: directory
+    mode: '0777'
+
+- name: Check for existing Zitadel login client PAT
+  ansible.builtin.stat:
+    path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/login-client.pat"
+  register: zitadel_login_pat
+
+- name: Determine if Zitadel bootstrap is required
+  ansible.builtin.set_fact:
+    zitadel_bootstrap_required: "{{ not zitadel_login_pat.stat.exists }}"
+
+- name: Bootstrap Zitadel with start-from-init on first run
+  ansible.builtin.lineinfile:
+    path: "{{ stacks_dest_dir }}/{{ stack_name }}/.env"
+    regexp: '^ZITADEL_COMMAND='
+    line: 'ZITADEL_COMMAND=start-from-init'
+    create: true
+    mode: '0600'
+  when: zitadel_bootstrap_required
 
 - name: Ensure Zitadel database service is running
   community.docker.docker_compose_v2:
@@ -40,4 +83,3 @@
       - zitadel-db
     state: present
     pull: "always"
-

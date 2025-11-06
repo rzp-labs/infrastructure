@@ -1,0 +1,43 @@
+---
+services:
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge # Added a name for clarity
+    restart: unless-stopped
+    volumes:
+      # Dockge data directory
+      - ./data:/app/data
+      # Stacks directory
+      - /opt/stacks:/opt/stacks
+    environment:
+      # Tell Dockge where is your stacks directory
+      - DOCKGE_STACKS_DIR=/opt/stacks
+      # Connect to the socket proxy service name and port 2375
+      - DOCKER_HOST=tcp://socket-proxy:2375
+      # Ensure you include variables from your root .env file if needed
+      - DOMAIN=${DOMAIN}
+    networks:
+      - socket-proxy
+      - traefik
+    # 2. ADD LABELS: Tell Traefik how to route traffic to this container
+    labels:
+      - "traefik.enable=true"
+      # Route based on the hostname, using the variable from your .env file
+      - "traefik.http.routers.dockge.rule=Host(`dockge.${DOMAIN}`)"
+      # Use HTTPS entrypoint defined in your Traefik config
+      - "traefik.http.routers.dockge.entrypoints=https"
+      # Use the Cloudflare cert resolver you defined
+      - "traefik.http.routers.dockge.tls.certresolver=cloudflare"
+      # Enable TLS
+      - "traefik.http.routers.dockge.tls=true"
+      # Use the oauth2-proxy middleware you set up for authentication
+      - "traefik.http.routers.dockge.middlewares=traefik-auth"
+      # Specify the port Dockge listens on internally (5001) for Traefik to route to
+      - "traefik.http.services.dockge.loadbalancer.server.port=5001"
+
+networks:
+  # Reference the external networks managed by the root orchestrator
+  socket-proxy:
+    external: true
+  traefik:
+    external: true

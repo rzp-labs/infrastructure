@@ -14,3 +14,4 @@ include:
   - docker-socket-proxy/docker-compose.yml
   - traefik/docker-compose.yml
   - zitadel/docker-compose.yml
+  - dockge/docker-compose.yml

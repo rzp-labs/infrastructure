@@ -1,0 +1,24 @@
+---
+- name: Docker doctor cleanup
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Prune unused containers, images, networks, and volumes
+      community.docker.docker_prune:
+        containers: true
+        images: true
+        networks: true
+        volumes: true
+        builder_cache: true
+
+    - name: Verify disk usage after prune
+      ansible.builtin.command:
+        cmd: docker system df
+      register: docker_df
+      changed_when: false
+
+    - name: Show Docker disk usage summary
+      ansible.builtin.debug:
+        var: docker_df.stdout

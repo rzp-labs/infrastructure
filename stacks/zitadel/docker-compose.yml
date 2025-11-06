@@ -20,19 +20,19 @@ services:
     depends_on:
       - zitadel-db
     command:
-      - start-from-init
+      - "${ZITADEL_COMMAND:-start}"
       - --masterkeyFromEnv
       - --tlsMode
       - "${ZITADEL_TLS_MODE:-external}"
       - --externalDomain
-      - "${ZITADEL_DOMAIN:-auth.example.com}"
+      - "${ZITADEL_PUBLIC_DOMAIN:-auth.example.com}"
       - --externalPort
       - "443"
       - --port
       - "${ZITADEL_SERVER_PORT:-8080}"
     environment:
       - ZITADEL_MASTERKEY=${ZITADEL_MASTERKEY:-replace-with-32-byte-hex}
-      - ZITADEL_EXTERNAL_DOMAIN=${ZITADEL_DOMAIN:-auth.example.com}
+      - ZITADEL_EXTERNAL_DOMAIN=${ZITADEL_PUBLIC_DOMAIN:-auth.example.com}
       - ZITADEL_EXTERNAL_PORT=443
       - ZITADEL_EXTERNAL_SECURE=true
       - ZITADEL_INTERNAL_PORT=${ZITADEL_SERVER_PORT:-8080}
@@ -50,25 +50,64 @@ services:
       - ZITADEL_FIRSTINSTANCE_PROJECT_NAME=${ZITADEL_PROJECT_NAME}
       - ZITADEL_FIRSTINSTANCE_MACHINE_KEY_NAME=${ZITADEL_MACHINE_KEY_NAME}
       - ZITADEL_FIRSTINSTANCE_MACHINE_KEY_EXPIRATION_DATE=${ZITADEL_MACHINE_KEY_EXPIRATION}
-      - ZITADEL_FIRSTINSTANCE_DOMAIN=${ZITADEL_DOMAIN}
+      - ZITADEL_FIRSTINSTANCE_DOMAIN=${ZITADEL_ORG_DOMAIN:-example.com}
       - ZITADEL_FIRSTINSTANCE_DOMAIN_PORT=443
+      - ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH=/zitadel/login-client.pat
+      - ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME=${ZITADEL_LOGINCLIENT_USERNAME:-login-client}
+      - ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME=${ZITADEL_LOGINCLIENT_NAME:-Automation Login Client}
+      - ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE=${ZITADEL_LOGINCLIENT_PAT_EXPIRATION:-2030-01-01T00:00:00Z}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME=${ZITADEL_ADMIN_USERNAME:-admin@example.com}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_FIRSTNAME=${ZITADEL_ADMIN_FIRST_NAME:-Admin}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_LASTNAME=${ZITADEL_ADMIN_LAST_NAME:-User}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_DISPLAYNAME=${ZITADEL_ADMIN_DISPLAY_NAME:-Admin User}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL=${ZITADEL_ADMIN_EMAIL:-admin@example.com}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED=true
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD=${ZITADEL_ADMIN_PASSWORD:-ChangeMeNow!}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED=true
     volumes:
-      - zitadel-config:/zitadel
+      - ./config:/zitadel
     networks:
       - zitadel
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_DOMAIN}`)"
       - "traefik.http.routers.zitadel.entrypoints=https"
       - "traefik.http.routers.zitadel.tls=true"
       - "traefik.http.routers.zitadel.tls.certresolver=cloudflare"
       - "traefik.docker.network=traefik"
       - "traefik.http.services.zitadel.loadbalancer.server.port=8080"
+      - "traefik.http.services.zitadel.loadbalancer.server.scheme=h2c"
+      - "traefik.http.routers.zitadel.priority=10"
+      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_PUBLIC_DOMAIN:-auth.example.com}`) && !PathPrefix(`/ui/v2/login`)"
+
+  zitadel-login:
+    image: ghcr.io/zitadel/zitadel-login:latest
+    container_name: zitadel-login
+    restart: unless-stopped
+    depends_on:
+      - zitadel
+    environment:
+      - ZITADEL_API_URL=http://zitadel:8080
+      - NEXT_PUBLIC_BASE_PATH=/ui/v2/login
+      - ZITADEL_SERVICE_USER_TOKEN_FILE=/zitadel/login-client.pat
+      - CUSTOM_REQUEST_HEADERS=Host:${ZITADEL_PUBLIC_DOMAIN:-auth.example.com}
+    volumes:
+      - ./config:/zitadel:ro
+    networks:
+      - traefik
+      - zitadel
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.zitadel-login.entrypoints=https"
+      - "traefik.http.routers.zitadel-login.rule=Host(`${ZITADEL_PUBLIC_DOMAIN:-auth.example.com}`) && PathPrefix(`/ui/v2/login`)"
+      - "traefik.http.routers.zitadel-login.tls=true"
+      - "traefik.http.routers.zitadel-login.tls.certresolver=cloudflare"
+      - "traefik.http.routers.zitadel-login.priority=20"
+      - "traefik.http.services.zitadel-login.loadbalancer.server.port=3000"
 
 volumes:
   zitadel-db-data:
-  zitadel-config:
 
 networks:
   zitadel:

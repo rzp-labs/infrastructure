@@ -35,13 +35,49 @@ services:
       - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
+      - "traefik.http.middlewares.traefik-auth.forwardauth.address=http://traefik-oauth2-proxy:4180"
+      - "traefik.http.middlewares.traefik-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.traefik-auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email"
       - "traefik.http.routers.traefik-secure.entrypoints=https"
       - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"
       - "traefik.http.routers.traefik-secure.tls=true"
       - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare"
       - "traefik.http.routers.traefik-secure.tls.domains[0].main=${DOMAIN}"
       - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.${DOMAIN}"
+      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
       - "traefik.http.routers.traefik-secure.service=api@internal"
+
+  traefik-oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: traefik-oauth2-proxy
+    restart: unless-stopped
+    environment:
+      - OAUTH2_PROXY_PROVIDER=oidc
+      - OAUTH2_PROXY_OIDC_ISSUER_URL=https://${ZITADEL_PUBLIC_DOMAIN}
+      - OAUTH2_PROXY_CLIENT_ID=${TRAEFIK_OAUTH_CLIENT_ID}
+      - OAUTH2_PROXY_CLIENT_SECRET=${TRAEFIK_OAUTH_CLIENT_SECRET}
+      - OAUTH2_PROXY_COOKIE_SECRET=${TRAEFIK_OAUTH_COOKIE_SECRET}
+      - OAUTH2_PROXY_REDIRECT_URL=https://traefik.${DOMAIN}/oauth2/callback
+      - OAUTH2_PROXY_COOKIE_DOMAINS=.${DOMAIN}
+      - OAUTH2_PROXY_WHITELIST_DOMAINS=.${DOMAIN}
+      - OAUTH2_PROXY_EMAIL_DOMAINS=${TRAEFIK_OAUTH_ALLOWED_EMAIL_DOMAIN}
+      - OAUTH2_PROXY_SCOPE=openid profile email
+      - OAUTH2_PROXY_UPSTREAMS=file:///dev/null
+      - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
+      - OAUTH2_PROXY_COOKIE_SECURE=true
+      - OAUTH2_PROXY_COOKIE_SAMESITE=lax
+      - OAUTH2_PROXY_SET_XAUTHREQUEST=true
+      - OAUTH2_PROXY_SKIP_PROVIDER_BUTTON=true
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.traefik-oauth2-proxy.entrypoints=https"
+      - "traefik.http.routers.traefik-oauth2-proxy.rule=Host(`traefik.${DOMAIN}`) && PathPrefix(`/oauth2`)"
+      - "traefik.http.routers.traefik-oauth2-proxy.tls=true"
+      - "traefik.http.routers.traefik-oauth2-proxy.tls.certresolver=cloudflare"
+      - "traefik.http.services.traefik-oauth2-proxy.loadbalancer.server.port=4180"
 
 networks:
   socket-proxy:

@@ -1,6 +1,6 @@
 # Docker Stacks
 
-This directory contains all Docker Compose stacks for the homelab infrastructure.
+This directory contains all Docker Compose stacks for the homelab infrastructure that Ansible deploys to the homelab VM.
 
 ## Architecture
 
@@ -8,9 +8,9 @@ This directory contains all Docker Compose stacks for the homelab infrastructure
 
 The root `docker-compose.yml` uses Docker Compose's `include` feature to orchestrate multiple stacks:
 
-- **Shared resources** (networks) are defined at the root level
-- **Individual stacks** are included and can still be managed independently
-- **Deployment order** is implicit based on dependency order
+- **Shared resources** are defined once and reused (networks, socket proxy)
+- **Individual stacks** remain self-contained and can be deployed independently
+- **Current includes**: `docker-socket-proxy`, `traefik`, and `zitadel`
 
 ### Directory Structure
 
@@ -18,40 +18,48 @@ The root `docker-compose.yml` uses Docker Compose's `include` feature to orchest
 stacks/
 ├── docker-compose.yml              # Root orchestrator (DO NOT COMMIT .env here)
 ├── docker-socket-proxy/
-│   └── docker-compose.yml          # Socket proxy service
-└── traefik/
-    ├── docker-compose.yml          # Traefik reverse proxy
-    ├── traefik.yml                 # Traefik static config
-    ├── .env.example                # Environment template
-    └── .env                        # Your secrets (gitignored)
+│   └── docker-compose.yml          # Docker socket proxy (tcp://socket-proxy:2375)
+├── traefik/
+│   ├── docker-compose.yml          # Traefik reverse proxy + oauth2-proxy
+│   ├── traefik.yml                 # Traefik static configuration
+│   ├── config/                     # Dynamic configuration snippets (synced)
+│   ├── acme.json                   # ACME certificate storage (created remotely)
+│   ├── .env.example                # Environment template (Cloudflare, domain, OAuth)
+│   └── .env                        # Actual secrets (gitignored)
+└── zitadel/
+    ├── docker-compose.yml          # Zitadel identity provider stack
+    ├── .env.example                # Bootstrap + domain configuration template
+    ├── .env                        # Actual secrets (gitignored)
+    └── config/                     # Shared runtime artifacts (e.g., PAT files)
 ```
 
 ## Deployment Options
 
 ### Option 1: Deploy All Stacks (Recommended)
 
-Deploy all stacks at once using the root orchestrator:
+Deploy all stacks at once using the root orchestrator playbook:
 
 ```bash
-make deploy-all
+make docker-deploy-all
 ```
 
 This will:
 1. Sync all stack files to `/opt/stacks` on the VM
-2. Create shared networks
-3. Deploy all services in proper order
-4. Pull latest images
+2. Ensure shared networks (`traefik`, `socket-proxy`) exist
+3. Deploy the socket proxy, Traefik, and Zitadel stacks in order
+4. Pull the latest images for each service
 
 ### Option 2: Deploy Individual Stack
 
 Deploy a single stack independently:
 
 ```bash
-make deploy stack=traefik
-make deploy stack=docker-socket-proxy
+make docker-deploy stack=traefik
+make docker-deploy stack=docker-socket-proxy
+make docker-deploy stack=zitadel
 ```
 
-Individual stacks reference `external: true` for shared networks, so they can be deployed independently after the network exists.
+Per-stack shortcuts are also available (`make docker-deploy-traefik`, etc.). Individual stacks reference `external: true` networks, so ensure the shared networks exist before deploying a new stack (see **Networks** below).
 
 ## Adding New Stacks
 
@@ -65,7 +73,7 @@ services:
     container_name: my-service
     restart: unless-stopped
     networks:
-      - proxy
+      - traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.my-service.rule=Host(`service.${DOMAIN}`)"
@@ -73,8 +81,8 @@ services:
       - "traefik.http.routers.my-service.tls.certresolver=cloudflare"
 
 networks:
-  proxy:
-    external: true  # References root-level network
+  traefik:
+    external: true  # References shared Traefik network
 ```
 
 3. **Add to root orchestrator** (`stacks/docker-compose.yml`):
@@ -88,10 +96,10 @@ include:
 4. **Deploy**:
 ```bash
 # Option A: Deploy just the new stack
-make deploy stack=my-service
+make docker-deploy stack=my-service
 
 # Option B: Redeploy everything
-make deploy-all
+make docker-deploy-all
 ```
 
 ## Environment Variables
@@ -109,17 +117,23 @@ stacks/my-service/.env    # Your service config
 
 ### Root .env File
 
-You can optionally create `stacks/.env` for variables shared across all stacks, but this is **not recommended** as it couples services together.
+You can optionally create `stacks/.env` for variables shared across all stacks, but this is **not recommended** because it couples otherwise independent services.
 
 ## Networks
 
-### Proxy Network
+### Shared Networks
 
-The `proxy` network is owned by the root compose and shared by all stacks:
+- **traefik**: Public reverse-proxy network. Any service that should be routable through Traefik must attach to this network.
+- **socket-proxy**: Internal network that exposes the Docker API via the docker-socket-proxy service. Only components that must talk to the Docker API (e.g., Traefik) should join this network.
 
-- **Created by**: Root `docker-compose.yml`
-- **Referenced by**: Individual stacks with `external: true`
-- **Purpose**: Allows Traefik to route traffic to services
+`make docker-deploy-all` ensures both networks exist. When deploying stacks individually, create them manually if they are missing:
+
+```bash
+make docker-deploy-all
+docker network create --internal socket-proxy
+```
+
+> **Legacy note:** Older documentation referenced a `proxy` network. The current stacks no longer use it, but `docker-deploy-all` still ensures dependencies are satisfied for backward compatibility. It is safe to delete if unused.
 
 ### Adding Custom Networks
 
@@ -127,10 +141,6 @@ Add networks to the root orchestrator:
 
 ```yaml
 networks:
-  proxy:
-    name: proxy
-    driver: bridge
-
   database:
     name: database
     driver: bridge
@@ -160,11 +170,12 @@ networks:
 If deploying individual stack fails with network error:
 
 ```bash
-# Create the network manually
-docker network create proxy
+make docker-deploy-all  # Already includes pull: always
+docker network create traefik
+docker network create --internal socket-proxy
 
 # Or deploy the root orchestrator first
-make deploy-all
+make docker-deploy-all
 ```
 
 ### Stack not updating
@@ -178,7 +189,7 @@ cd /opt/stacks/my-service
 docker compose up -d --force-recreate
 
 # All stacks
-make deploy-all  # Already includes pull: always
+make docker-deploy-all  # Already includes pull: always
 ```
 
 ### View logs

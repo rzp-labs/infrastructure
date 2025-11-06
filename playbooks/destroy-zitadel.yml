@@ -30,13 +30,15 @@
         state: absent
         remove_orphans: true
 
-    - name: Remove Zitadel volumes
+    - name: Remove Zitadel database volume
       community.docker.docker_volume:
-        name: "{{ item }}"
+        name: "{{ stack_name }}_zitadel-db-data"
         state: absent
-      loop:
-        - "{{ stack_name }}_zitadel-db-data"
-        - "{{ stack_name }}_zitadel-config"
+
+    - name: Remove Zitadel config directory on host
+      ansible.builtin.file:
+        path: "{{ zitadel_compose_dir }}/config"
+        state: absent
 
     - name: Remove Zitadel initialization marker
       ansible.builtin.file:

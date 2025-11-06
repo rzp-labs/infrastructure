@@ -31,6 +31,34 @@
         pull: "always"
       register: zitadel_deploy
 
+    - name: Wait for Zitadel login client PAT to be created
+      ansible.builtin.wait_for:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/login-client.pat"
+        state: present
+        timeout: 300
+        sleep: 5
+
+    - name: Ensure Zitadel login client PAT is readable by dependents
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/login-client.pat"
+        mode: '0644'
+
+    - name: Reset Zitadel command to steady-state start
+      ansible.builtin.lineinfile:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/.env"
+        regexp: '^ZITADEL_COMMAND='
+        line: 'ZITADEL_COMMAND=start'
+        create: true
+        mode: '0600'
+      when: zitadel_bootstrap_required | default(false)
+
+    - name: Record Zitadel bootstrap completion
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/.bootstrap_complete"
+        state: touch
+        mode: '0644'
+      when: zitadel_bootstrap_required | default(false)
+
     - name: Show Zitadel deployment result
       ansible.builtin.debug:
         var: zitadel_deploy

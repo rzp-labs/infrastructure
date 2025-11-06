@@ -1,0 +1,86 @@
+---
+- name: Deploy Docker Compose stack to homelab
+  hosts: homelab
+  become: true
+  strategy: linear
+
+  vars:
+    stack_name: "{{ stack | default('') }}"
+    stacks_src_dir: "../stacks"
+    stacks_dest_dir: "/opt/stacks"
+    zitadel_init_marker_path: "{{ stacks_dest_dir }}/zitadel/.zitadel_initialized"
+
+  tasks:
+    - name: Run shared stack deployment tasks
+      ansible.builtin.include_tasks: tasks/deploy-stack-base.yml
+
+    - name: Check for stack-specific tasks
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/tasks/stacks/{{ stack_name }}.yml"
+      register: stack_specific_tasks
+      delegate_to: localhost
+      become: false
+
+    - name: Run stack-specific tasks
+      ansible.builtin.include_tasks: "tasks/stacks/{{ stack_name }}.yml"
+      when: stack_specific_tasks.stat.exists
+
+    - name: Deploy stack with docker-compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dest_dir }}/{{ stack_name }}"
+        state: present
+        pull: "always"
+      register: output
+
+    - name: Wait for Zitadel login client PAT to be created
+      ansible.builtin.wait_for:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/login-client.pat"
+        state: present
+        timeout: 300
+        sleep: 5
+      when: stack_name == 'zitadel'
+
+    - name: Ensure Zitadel login client PAT is readable by dependents
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/login-client.pat"
+        mode: '0644'
+      when: stack_name == 'zitadel'
+
+    - name: Reset Zitadel command to steady-state start
+      ansible.builtin.lineinfile:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/.env"
+        regexp: '^ZITADEL_COMMAND='
+        line: 'ZITADEL_COMMAND=start'
+        create: true
+        mode: '0600'
+      when:
+        - stack_name == 'zitadel'
+        - zitadel_bootstrap_required | default(false)
+
+    - name: Record Zitadel bootstrap completion
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/{{ stack_name }}/config/.bootstrap_complete"
+        state: touch
+        mode: '0644'
+      when:
+        - stack_name == 'zitadel'
+        - zitadel_bootstrap_required | default(false)
+
+    - name: Enable Zitadel self-registration in login policy
+      community.docker.docker_container_exec:
+        container: zitadel-db
+        command: >-
+          psql -U postgres -d zitadel -c "UPDATE projections.login_policies5
+              SET allow_register = TRUE,
+                  allow_username_password = TRUE,
+                  hide_password_reset = FALSE
+              WHERE owner_removed = FALSE;"
+      register: update_login_policy
+      changed_when: update_login_policy.rc == 0 and ('UPDATE 0' not in update_login_policy.stdout)
+      failed_when:
+        - update_login_policy.rc != 0
+      when: stack_name == 'zitadel'
+
+    - name: Show deployment result
+      ansible.builtin.debug:
+        var: output

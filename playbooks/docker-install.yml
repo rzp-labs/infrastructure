@@ -1,0 +1,32 @@
+---
+- name: Install Docker on homelab hosts
+  hosts: homelab
+  become: true
+  gather_facts: true
+
+  vars:
+    docker_install_compose_plugin: false  # keep standalone docker compose binary
+    docker_install_compose: true
+    docker_compose_version: "v2.32.1"
+    docker_users:
+      - "{{ ansible_user | default('admin') }}"
+
+  pre_tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - gnupg
+          - ca-certificates
+          - apt-transport-https
+          - python3-pip
+        state: present
+        update_cache: true
+
+  roles:
+    - geerlingguy.docker
+
+  post_tasks:
+    - name: Ensure Python Docker SDK is present for Ansible modules
+      ansible.builtin.apt:
+        name: python3-docker
+        state: present

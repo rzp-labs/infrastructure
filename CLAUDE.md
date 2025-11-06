@@ -42,7 +42,7 @@ make lint           # Alias for check
 
 # Connectivity and deployment
 make ping           # Test VM connectivity
-make deploy stack=<name>  # Deploy single stack
+make docker-deploy stack=<name>  # Deploy single stack
 make check-deploy   # Validate deployment configuration
 
 # Development
@@ -101,7 +101,7 @@ docker network create proxy  # Created by root orchestrator
      - "traefik.http.routers.my-service.tls.certresolver=cloudflare"
    ```
 3. Create `.env.example` template
-4. Deploy: `make deploy stack=my-service`
+4. Deploy: `make docker-deploy stack=my-service`
 5. Optionally add to root orchestrator's `include` list
 
 ## Configuration

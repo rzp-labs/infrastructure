@@ -1,0 +1,68 @@
+---
+- name: Deploy all stacks
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    stacks_src_dir: "{{ ([playbook_dir, '..', 'stacks'] | path_join) | realpath }}"
+    stacks_dir: /opt/stacks
+    root_project_name: stacks
+    stack_state: "{{ stack_state | default('present') }}"
+    backup_dir: /opt/stack_backups
+    compose_backup_suffix: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+
+  tasks:
+    - name: Ensure base directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ stacks_dir }}"
+        - "{{ backup_dir }}"
+
+    - name: Ensure rsync is available on remote host
+      ansible.builtin.package:
+        name: rsync
+        state: present
+
+    - name: Synchronize root stacks directory
+      ansible.posix.synchronize:
+        src: "{{ stacks_src_dir }}/"
+        dest: "{{ stacks_dir }}/"
+        delete: false
+        recursive: true
+        rsync_opts:
+          - "--perms"
+          - "--times"
+          - "--omit-dir-times"
+        ssh_args: "{{ ansible_ssh_common_args | default('') }} -o IdentitiesOnly=yes"
+        use_ssh_args: true
+        rsync_path: "sudo rsync"
+      delegate_to: localhost
+      become: false
+
+    - name: Set permissions on traefik acme.json
+      ansible.builtin.file:
+        path: "{{ stacks_dir }}/traefik/acme.json"
+        state: touch
+        mode: '0600'
+
+    - name: Back up current Compose files before deploy
+      community.general.archive:
+        path: "{{ stacks_dir }}"
+        dest: "{{ backup_dir }}/compose_backup_{{ compose_backup_suffix }}.tar.gz"
+        format: gz
+        mode: "0644"
+      register: backup_result
+      changed_when: backup_result.dest is defined
+      failed_when: backup_result.failed is defined and backup_result.failed
+      when: stack_state == 'present'
+
+    - name: Deploy all stacks via root orchestrator
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dir }}"
+        project_name: "{{ root_project_name }}"
+        state: "{{ stack_state }}"
+        pull: "{{ 'always' if stack_state == 'present' else 'missing' }}"

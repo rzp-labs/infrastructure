@@ -33,7 +33,7 @@ Infrastructure is a **standalone project** that lives as a git submodule within 
 ```bash
 cd infrastructure
 make setup
-make deploy stack=traefik
+make docker-deploy stack=traefik
 ```
 
 ## Build/Test/Lint Commands
@@ -79,7 +79,7 @@ make test           # Validate Ansible playbooks and configuration
 ### Deployment
 ```bash
 make ping                          # Test SSH connectivity to VM
-make deploy stack=<stack-name>     # Deploy single stack
+make docker-deploy stack=<stack-name>     # Deploy single stack
 make check-deploy                  # Validate deployment configuration
 ```
 
@@ -138,9 +138,9 @@ infrastructure/
 │   ├── hosts.yml.example          # Template for VM configuration
 │   └── hosts.yml                  # Your inventory (gitignored)
 ├── playbooks/
-│   ├── install-docker.yml         # Install Docker on VM
+│   ├── docker-install.yml         # Install Docker on VM
 │   ├── deploy-stack.yml           # Deploy single stack
-│   └── deploy-all-stacks.yml      # Deploy all stacks sequentially
+│   └── docker-deploy-all.yml      # Deploy all stacks sequentially
 ├── stacks/                        # Docker Compose stacks
 │   ├── docker-compose.yml         # Root orchestrator (include pattern)
 │   ├── docker-socket-proxy/       # Security proxy for Docker API
@@ -241,7 +241,7 @@ SSL certificates automatically obtained via Let's Encrypt using Cloudflare DNS c
 1. Create `stacks/my-service/docker-compose.yml`
 2. Join proxy network and add Traefik labels
 3. Create `.env.example` template
-4. Deploy: `make deploy stack=my-service`
+4. Deploy: `make docker-deploy stack=my-service`
 5. Optionally add to root orchestrator's `include` list
 
 ## Configuration Management

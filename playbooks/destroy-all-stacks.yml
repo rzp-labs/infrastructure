@@ -1,0 +1,3 @@
+---
+- name: Legacy wrapper for docker-destroy-all
+  import_playbook: docker-destroy-all.yml

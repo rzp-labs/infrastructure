@@ -1,0 +1,65 @@
+---
+- name: Destroy all stacks (destructive)
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+    stacks_dir: /opt/stacks
+    root_compose_path: "{{ stacks_dir }}/docker-compose.yml"
+    confirmation_prompt: |
+      You are about to DESTROY all Docker stacks, containers, and volumes managed under {{ stacks_dir }}.
+      Type "destroy" to continue, or anything else to abort:
+
+  tasks:
+    - name: Confirm destructive destroy
+      ansible.builtin.pause:
+        prompt: "{{ confirmation_prompt }}"
+      register: destroy_confirm
+
+    - name: Abort if confirmation not provided
+      ansible.builtin.fail:
+        msg: "docker-destroy-all aborted by user"
+      when: destroy_confirm.user_input | lower != 'destroy'
+
+    - name: Check for root orchestrator compose file
+      ansible.builtin.stat:
+        path: "{{ root_compose_path }}"
+      register: root_compose
+
+    - name: Bring down root orchestrator
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dir }}"
+        state: absent
+        remove_orphans: true
+      when: root_compose.stat.exists
+
+    - name: Discover stack directories when root orchestrator missing
+      ansible.builtin.find:
+        paths: "{{ stacks_dir }}"
+        file_type: file
+        patterns: docker-compose.yml
+        recurse: true
+      register: stack_compose_matches
+      when: not root_compose.stat.exists
+
+    - name: Bring down individual stacks
+      community.docker.docker_compose_v2:
+        project_src: "{{ item.path | dirname }}"
+        state: absent
+        remove_orphans: true
+      loop: "{{ stack_compose_matches.files | default([]) }}"
+      when: not root_compose.stat.exists
+
+    - name: Remove Docker volumes owned by root project
+      community.docker.docker_volume:
+        name: "{{ item.name }}"
+        state: absent
+      loop: "{{ query('community.docker.docker_volumes') }}"
+
+    - name: Prune unused Docker objects
+      community.docker.docker_prune:
+        containers: true
+        images: true
+        networks: true
+        volumes: true

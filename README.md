@@ -69,7 +69,7 @@ After the first connection, the host key is saved to `~/.ssh/known_hosts` and al
 ### 4. Install Docker on VM
 
 ```bash
-make install-docker
+make docker-install
 ```
 
 ### 5. Deploy Docker Socket Proxy
@@ -77,7 +77,7 @@ make install-docker
 For security, deploy the socket proxy first:
 
 ```bash
-make deploy stack=docker-socket-proxy
+make docker-deploy stack=docker-socket-proxy
 ```
 
 ### 6. Configure Traefik
@@ -101,7 +101,7 @@ TZ=America/Phoenix
 ### 7. Deploy Traefik
 
 ```bash
-make deploy stack=traefik
+make docker-deploy stack=traefik
 ```
 
 ### 8. Configure DNS & Port Forwarding
@@ -126,7 +126,7 @@ infrastructure/
 │   ├── hosts.yml.example            # Inventory template (copy to hosts.yml)
 │   └── hosts.yml                    # Your inventory (gitignored)
 ├── playbooks/
-│   ├── install-docker.yml           # Install Docker using geerlingguy.docker
+│   ├── docker-install.yml           # Install Docker using geerlingguy.docker
 │   └── deploy-stack.yml             # Deploy compose stacks to VM
 ├── stacks/                          # Docker compose stacks
 │   ├── docker-socket-proxy/         # Secure Docker API proxy
@@ -148,7 +148,7 @@ infrastructure/
 Create a new directory in `stacks/`:
 
 ```bash
-mkdir -p stacks/my-service
+make docker-install
 ```
 
 Create `docker-compose.yml` with Traefik labels:
@@ -176,14 +176,14 @@ networks:
 Deploy:
 
 ```bash
-make deploy stack=my-service
+make docker-deploy stack=my-service
 ```
 
 ## Common Commands
 
 ```bash
-# Setup (first time)
-make setup
+make docker-deploy stack=traefik
+make docker-deploy stack=my-service
 
 # Lint & format
 make lint
@@ -193,11 +193,11 @@ make format
 make ping
 
 # Install Docker on the VM
-make install-docker
+make docker-install
 
 # Deploy a stack
-make deploy stack=traefik
-make deploy stack=my-service
+make docker-deploy stack=traefik
+make docker-deploy stack=my-service
 
 # Run ad-hoc Ansible commands
 uv run ansible homelab -a "docker ps"
