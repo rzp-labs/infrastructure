@@ -118,6 +118,47 @@ make docker-deploy stack=traefik
 - Local: `http://YOUR_VM_IP:8080/dashboard/`
 - External: `https://traefik.yourdomain.com`
 
+## Automated Bootstrap (NEW)
+
+For fresh deployments, use the orchestrated bootstrap instead of manual steps:
+
+```bash
+# Clean any existing deployment
+make docker-destroy-all   # Type "destroy" to confirm
+
+# Run orchestrated bootstrap (4 stages: foundation, OAuth, proxy, services)
+make docker-bootstrap
+
+# Verify infrastructure health
+make docker-check-health
+```
+
+**What Bootstrap Does:**
+1. **Foundation Stage** - Deploy socket proxy, database, and Zitadel
+2. **OAuth Setup** - Create Traefik OAuth app in Zitadel automatically
+3. **Proxy Layer** - Deploy Traefik with valid OAuth credentials
+4. **Services** - Deploy remaining services (dockge, zitadel-login)
+
+**Bootstrap Benefits:**
+- ✅ Automated OAuth application creation via Zitadel API
+- ✅ Dynamic credential injection into .env files
+- ✅ Proper deployment order with health checks
+- ✅ Single command replaces 8-step manual process
+
+## Manual Deployment (Legacy)
+
+If you prefer manual control:
+
+```bash
+make docker-deploy-all
+```
+
+Then check health:
+
+```bash
+make docker-check-health
+```
+
 ## Structure
 
 ```
