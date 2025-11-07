@@ -11,7 +11,7 @@ DOCKER_DEPLOY_STACK_TARGETS := $(addprefix docker-deploy-,$(STACK_DIRS))
 .PHONY: help install check test setup lint format ping deploy docker-deploy\
  				 check-deploy clean destroy-zitadel docker-install docker-destroy-all\
 				 docker-restart-all docker-stop-all docker-start-all docker-doctor\
-				 docker-deploy-all docker-bootstrap docker-check-health $(DEPLOY_STACK_TARGETS)\
+		 docker-deploy-all docker-bootstrap docker-check-health ssh-prime $(DEPLOY_STACK_TARGETS)\
 				 $(DOCKER_DEPLOY_STACK_TARGETS) check-deploy clean destroy bootstrap\
 				 test-molecule test-quality test-standards test-quick test-all\
 				 test-coverage test-ci report clean-all $(DEPLOY_STACK_TARGETS)
@@ -55,6 +55,7 @@ help: ## Show this help message
 	@echo "  make docker-restart-all  Restart all stacks"
 	@echo "  make docker-destroy-all  Remove all stacks and data (interactive confirm)"
 	@echo "  make docker-doctor       Remove unused Docker resources"
+	@echo "  make ssh-prime           Refresh repo-managed SSH host fingerprints"
 	@echo "  make destroy-zitadel     Destroy Zitadel stack (interactive confirmation)"
 	@echo "  make check-deploy        Validate deployment configuration"
 	@echo ""
@@ -144,6 +145,7 @@ lint: check ## Alias for check (backward compatibility)
 
 ping: ## Test SSH connectivity to VM
 	@echo "Testing VM connectivity..."
+	uv run python scripts/update_known_hosts.py
 	uv run ansible homelab -m ping
 
 docker-deploy: ## Deploy a stack (usage: make docker-deploy stack=<stack-name>)
@@ -153,6 +155,7 @@ docker-deploy: ## Deploy a stack (usage: make docker-deploy stack=<stack-name>)
 		exit 1; \
 	fi
 	@echo "Deploying stack: $(stack)"
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-deploy-stack.yml -e "stack_name=$(stack)"
 
 deploy: ## [deprecated] Use docker-deploy instead
@@ -160,14 +163,17 @@ deploy: ## [deprecated] Use docker-deploy instead
 
 docker-deploy-all: ## Deploy all stacks using root orchestrator
 	@echo "Deploying all stacks..."
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-deploy-all.yml
 
 docker-bootstrap: ## Bootstrap infrastructure with orchestrated deployment and OAuth setup
 	@echo "Bootstrapping infrastructure..."
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-bootstrap.yml
 
 docker-check-health: ## Check infrastructure health and report status
 	@echo "Checking infrastructure health..."
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-check-health.yml
 
 deploy-all: ## [deprecated] Use docker-deploy-all instead
@@ -180,22 +186,31 @@ $(DOCKER_DEPLOY_STACK_TARGETS): ## Deploy specific stack via docker shortcut
 	@$(MAKE) docker-deploy stack=$(patsubst docker-deploy-%,%,$@)
 
 docker-install: ## Provision Docker engine and compose on homelab host
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-install.yml
 
 docker-start-all: ## Start all stacks via root orchestrator
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-deploy-all.yml
 
 docker-stop-all: ## Stop all stacks without removing volumes
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-deploy-all.yml --extra-vars "stack_state=stopped"
 
 docker-restart-all: ## Restart all stacks via root orchestrator
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-deploy-all.yml --extra-vars "stack_state=restarted"
 
 docker-destroy-all: ## Destroy all stacks and associated data (requires confirmation)
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-destroy-all.yml
 
 docker-doctor: ## Prune unused Docker artifacts on homelab host
+	uv run python scripts/update_known_hosts.py
 	uv run ansible-playbook playbooks/docker-doctor.yml
+
+ssh-prime: ## Refresh repo-managed SSH host fingerprints from inventory
+	uv run python scripts/update_known_hosts.py
 
 destroy-zitadel: ## Destroy Zitadel stack (prompts for confirmation)
 	@echo "Destroying Zitadel stack (you will be prompted to confirm)..."
