@@ -1,0 +1,17 @@
+---
+zitadel_oidc_defaults:
+  response_types:
+    - OIDC_RESPONSE_TYPE_CODE
+  grant_types:
+    - OIDC_GRANT_TYPE_AUTHORIZATION_CODE
+  app_type: OIDC_APP_TYPE_WEB
+  auth_method_type: OIDC_AUTH_METHOD_TYPE_BASIC
+  dev_mode: false
+  access_token_type: OIDC_TOKEN_TYPE_BEARER
+  post_logout_redirect_uris: []
+  additional_origins: []
+  version: OIDC_VERSION_1_0
+  skip_native_app_success_page: false
+  env_var_defaults:
+    client_id_var: TRAEFIK_OAUTH_CLIENT_ID
+    client_secret_var: TRAEFIK_OAUTH_CLIENT_SECRET

@@ -8,7 +8,7 @@
     stacks_src_dir: "{{ ([playbook_dir, '..', 'stacks'] | path_join) | realpath }}"
     stacks_dir: /opt/stacks
     root_project_name: stacks
-    stack_state: "{{ stack_state | default('present') }}"
+    stack_state: present
     backup_dir: /opt/stack_backups
     compose_backup_suffix: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
 
@@ -37,8 +37,7 @@
           - "--perms"
           - "--times"
           - "--omit-dir-times"
-        ssh_args: "{{ ansible_ssh_common_args | default('') }} -o IdentitiesOnly=yes"
-        use_ssh_args: true
+        ssh_args: "{{ ((ansible_ssh_common_args | default('')) ~ ' -o IdentitiesOnly=yes') | trim }}"
         rsync_path: "sudo rsync"
       delegate_to: localhost
       become: false

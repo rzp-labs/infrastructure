@@ -30,7 +30,12 @@
 
     - name: Calculate container counts
       ansible.builtin.set_fact:
-        container_analysis: "{{ container_analysis | combine({'running_count': (container_analysis.running | length), 'issue_count': ((container_analysis.restarting | length) + (container_analysis.unhealthy | length))}) }}"
+        container_analysis: >
+          {{ container_analysis | combine({
+            'running_count': (container_analysis.running | length),
+            'issue_count': ((container_analysis.restarting | length) +
+                            (container_analysis.unhealthy | length))
+          }) }}
       changed_when: false
 
     - name: Get network status
