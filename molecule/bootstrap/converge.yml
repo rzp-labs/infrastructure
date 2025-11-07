@@ -5,6 +5,14 @@
   gather_facts: true
 
   tasks:
+    - name: Determine infrastructure project root
+      ansible.builtin.set_fact:
+        infrastructure_root: "/opt/infrastructure"
+
+    - name: Show infrastructure project root
+      ansible.builtin.debug:
+        var: infrastructure_root
+
     - name: Create inventory for bootstrap test
       ansible.builtin.copy:
         dest: /tmp/bootstrap_inventory.yml
@@ -19,13 +27,22 @@
                     ansible_python_interpreter: "{{ ansible_python.executable }}"
         mode: '0644'
 
+    - name: Create bootstrap extra vars file
+      ansible.builtin.copy:
+        dest: /tmp/bootstrap_vars.yml
+        content: |
+          stacks_src_dir: /tmp/stacks
+          stacks_dir: /tmp/stacks
+          ansible_date_time:
+            iso8601: "2025-01-01T00:00:00Z"
+        mode: '0644'
+
     - name: Run bootstrap playbook (limited test)
       ansible.builtin.shell: |
         cd /tmp
         ansible-playbook -i bootstrap_inventory.yml \
-          -e "stacks_src_dir=/tmp/stacks" \
-          -e "stacks_dir=/tmp/stacks" \
-          /opt/infrastructure/playbooks/docker-check-health.yml || true
+          -e @/tmp/bootstrap_vars.yml \
+          "{{ infrastructure_root }}/playbooks/docker-check-health.yml"
       args:
         executable: /bin/bash
       environment:
@@ -33,8 +50,8 @@
         DOMAIN: "test.local"
         ZITADEL_PUBLIC_DOMAIN: "auth.test.local"
       register: bootstrap_result
-      changed_when: true
-      ignore_errors: true
+      changed_when: false
+      failed_when: bootstrap_result.rc != 0
 
     - name: Display bootstrap result
       ansible.builtin.debug:

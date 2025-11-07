@@ -5,14 +5,14 @@
 dependency:
   name: galaxy
   options:
-    requirements-file: ../../requirements.yml
+    requirements-file: requirements.yml
 
 driver:
   name: docker
 
 platforms:
   - name: instance
-    image: debian:13-slim
+    image: geerlingguy/docker-debian13-ansible:latest
     pre_build_image: true
     privileged: false
     capabilities:
@@ -32,8 +32,8 @@ provisioner:
   config_options:
     defaults:
       interpreter_python: auto_silent
-      callbacks_enabled: profile_tasks, timer
-      stdout_callback: yaml
+      callbacks_enabled: timer
+      stdout_callback: ansible.builtin.default
     ssh_connection:
       pipelining: true
   inventory:

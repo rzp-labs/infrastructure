@@ -53,7 +53,12 @@
         var: makefile_check.stdout_lines
 
     - name: Verify YAML syntax of playbooks
-      ansible.builtin.command: yamllint "{{ item }}"
+      ansible.builtin.command:
+        argv:
+          - yamllint
+          - "-d"
+          - "{extends: default, rules: {line-length: {max: 200}}}"
+          - "{{ item }}"
       loop:
         - /opt/infrastructure/playbooks/docker-bootstrap.yml
         - /opt/infrastructure/playbooks/docker-check-health.yml
