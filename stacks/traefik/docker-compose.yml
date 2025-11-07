@@ -80,9 +80,5 @@ services:
       - "traefik.http.services.traefik-oauth2-proxy.loadbalancer.server.port=4180"
 
 networks:
-  socket-proxy:
-    name: socket-proxy
-    external: true
   traefik:
-    name: traefik
-    external: true
+  socket-proxy:

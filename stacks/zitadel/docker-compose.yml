@@ -113,4 +113,3 @@ networks:
   zitadel:
     internal: true
   traefik:
-    external: true

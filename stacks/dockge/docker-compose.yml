@@ -36,8 +36,5 @@ services:
       - "traefik.http.services.dockge.loadbalancer.server.port=5001"
 
 networks:
-  # Reference the external networks managed by the root orchestrator
   socket-proxy:
-    external: true
   traefik:
-    external: true

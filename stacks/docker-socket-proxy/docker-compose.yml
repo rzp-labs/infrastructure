@@ -36,5 +36,3 @@ services:
 
 networks:
   socket-proxy:
-    name: socket-proxy
-    external: true
