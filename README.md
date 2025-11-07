@@ -206,10 +206,25 @@ uv run ansible homelab -a "df -h"
 
 ## Development
 
+### Testing
+
+The project uses a comprehensive test suite to ensure IaC quality and reliability:
+
+```bash
+make test          # Run full test suite (linting + Molecule + quality checks)
+make test-quick    # Fast tests only (<5s: pytest + linting)
+make test-molecule # Integration tests with idempotence verification
+make test-quality  # IaC quality analysis on analyze_iac.py
+```
+
+**Test coverage**: 80% on critical Python scripts (analyze_iac.py), with a balanced test distribution optimized for IaC: 60% static analysis, 30% integration tests via Molecule, 10% end-to-end deployment validation.
+
+See [docs/TEST_STRATEGY.md](docs/TEST_STRATEGY.md) and [tests/README.md](tests/README.md) for complete testing documentation.
+
 ### Linting & Formatting
 
 ```bash
-make lint    # Check YAML, Ansible, shell scripts
+make check   # Check YAML, Ansible, shell scripts (or use 'make lint')
 make format  # Auto-format YAML and shell scripts
 ```
 
@@ -220,6 +235,8 @@ make format  # Auto-format YAML and shell scripts
 - **yamlfmt**: YAML formatting (install: `brew install yamlfmt`)
 - **shfmt**: Shell script formatting (install: `brew install shfmt`)
 - **ruff**: Python linting/formatting (dev-dependency)
+- **pytest**: Python unit testing framework
+- **Molecule**: Ansible integration testing with Docker
 
 ## Notes
 

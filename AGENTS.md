@@ -73,8 +73,17 @@ make format         # Auto-format YAML and shell scripts
 
 ### Testing
 ```bash
-make test           # Validate Ansible playbooks and configuration
+make test           # Run full test suite (linting + Molecule + quality analysis)
+make test-quick     # Fast tests only (<5s: pytest unit tests + linting)
+make test-molecule  # Integration tests with idempotence verification
+make test-quality   # IaC quality analysis (analyze_iac.py coverage)
+make test-coverage  # Generate pytest coverage report
+make report         # Generate quality reports (JSON + Markdown)
 ```
+
+**Test Philosophy**: IaC-adapted test pyramid with 60% static analysis, 30% integration (Molecule), 10% end-to-end validation. Focus on 80% coverage for critical Python tooling (analyze_iac.py).
+
+See [tests/README.md](tests/README.md) for comprehensive testing guide.
 
 ### Deployment
 ```bash
