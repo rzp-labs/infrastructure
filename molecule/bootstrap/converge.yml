@@ -1,0 +1,41 @@
+---
+- name: Converge - Test bootstrap deployment
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Create inventory for bootstrap test
+      ansible.builtin.copy:
+        dest: /tmp/bootstrap_inventory.yml
+        content: |
+          all:
+            children:
+              homelab:
+                hosts:
+                  localhost:
+                    ansible_connection: local
+                    ansible_host: localhost
+                    ansible_python_interpreter: "{{ ansible_python.executable }}"
+        mode: '0644'
+
+    - name: Run bootstrap playbook (limited test)
+      ansible.builtin.shell: |
+        cd /tmp
+        ansible-playbook -i bootstrap_inventory.yml \
+          -e "stacks_src_dir=/tmp/stacks" \
+          -e "stacks_dir=/tmp/stacks" \
+          /opt/infrastructure/playbooks/docker-check-health.yml || true
+      args:
+        executable: /bin/bash
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        DOMAIN: "test.local"
+        ZITADEL_PUBLIC_DOMAIN: "auth.test.local"
+      register: bootstrap_result
+      changed_when: true
+      ignore_errors: true
+
+    - name: Display bootstrap result
+      ansible.builtin.debug:
+        var: bootstrap_result

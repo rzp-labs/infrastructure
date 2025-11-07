@@ -1,0 +1,47 @@
+---
+- name: Prepare for bootstrap test
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose
+          - git
+          - curl
+          - python3-pip
+        state: present
+        update_cache: true
+
+    - name: Start Docker daemon
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Wait for Docker to be ready
+      ansible.builtin.wait_for:
+        port: 2375
+        delay: 2
+        timeout: 30
+      ignore_errors: true
+
+    - name: Create mock environment variables
+      ansible.builtin.set_fact:
+        test_domain: "test.local"
+        test_zitadel_domain: "auth.test.local"
+
+    - name: Set environment variables for test
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        line: "{{ item }}"
+        state: present
+      loop:
+        - "DOMAIN=test.local"
+        - "ZITADEL_PUBLIC_DOMAIN=auth.test.local"
+        - "CLOUDFLARE_DNS_API_TOKEN=test-token"
+        - "ACME_EMAIL=test@test.local"
+        - "TZ=UTC"
