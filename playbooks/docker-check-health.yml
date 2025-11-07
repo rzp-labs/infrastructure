@@ -1,0 +1,139 @@
+---
+- name: Check infrastructure health and report status
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    stacks_dir: /opt/stacks
+
+  tasks:
+    - name: Get all containers status
+      ansible.builtin.command: docker ps -a --format json
+      register: containers_raw
+      changed_when: false
+      check_mode: false
+
+    - name: Parse container information
+      ansible.builtin.set_fact:
+        all_containers: "{{ containers_raw.stdout | from_json | default([]) }}"
+      changed_when: false
+
+    - name: Analyze container health
+      ansible.builtin.set_fact:
+        container_analysis:
+          running: "{{ all_containers | selectattr('State', 'search', 'running') | list }}"
+          restarting: "{{ all_containers | selectattr('State', 'search', 'restarting|exited') | list }}"
+          unhealthy: "{{ all_containers | selectattr('Health', 'search', 'unhealthy') | list }}"
+          total: "{{ all_containers | length }}"
+      changed_when: false
+
+    - name: Calculate container counts
+      ansible.builtin.set_fact:
+        container_analysis: "{{ container_analysis | combine({'running_count': (container_analysis.running | length), 'issue_count': ((container_analysis.restarting | length) + (container_analysis.unhealthy | length))}) }}"
+      changed_when: false
+
+    - name: Get network status
+      ansible.builtin.command: docker network ls --format json
+      register: networks_raw
+      changed_when: false
+      check_mode: false
+
+    - name: Parse network information
+      ansible.builtin.set_fact:
+        networks_list: "{{ networks_raw.stdout | from_json | default([]) }}"
+      changed_when: false
+
+    - name: Check required networks
+      ansible.builtin.set_fact:
+        required_networks:
+          - stacks_traefik
+          - stacks_socket-proxy
+          - stacks_zitadel
+        actual_networks: "{{ networks_list | map(attribute='Name') | list }}"
+      changed_when: false
+
+    - name: Verify networks exist
+      ansible.builtin.set_fact:
+        network_status:
+          required: "{{ required_networks }}"
+          found: "{{ actual_networks }}"
+          missing: "{{ required_networks | difference(actual_networks) }}"
+      changed_when: false
+
+    - name: Calculate missing network count
+      ansible.builtin.set_fact:
+        network_status: "{{ network_status | combine({'missing_count': (network_status.missing | length)}) }}"
+      changed_when: false
+
+    - name: Collect container logs for analysis
+      ansible.builtin.shell: |
+        docker logs {{ item.Names }} --tail 30 2>&1 | grep -i "error\|fatal\|exception\|failed" | wc -l
+      register: error_counts
+      loop: "{{ all_containers }}"
+      changed_when: false
+      ignore_errors: true
+      check_mode: false
+
+    - name: Build health report
+      ansible.builtin.set_fact:
+        health_report:
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          containers:
+            total: "{{ container_analysis.total }}"
+            running: "{{ container_analysis.running_count }}"
+            issues: "{{ container_analysis.issue_count }}"
+            details: "{{ container_analysis }}"
+          networks:
+            required: "{{ network_status.required | length }}"
+            found: "{{ network_status.found | length }}"
+            missing: "{{ network_status.missing_count }}"
+            details: "{{ network_status }}"
+          status: "{{ 'healthy' if (container_analysis.issue_count == 0 and network_status.missing_count == 0) else 'unhealthy' }}"
+      changed_when: false
+
+    - name: Save health report to JSON file
+      ansible.builtin.copy:
+        content: "{{ health_report | to_nice_json }}"
+        dest: /tmp/infrastructure_health.json
+        mode: '0644'
+      changed_when: false
+
+    - name: Display health summary
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          Infrastructure Health Report
+          ================================================================================
+          Timestamp: {{ health_report.timestamp }}
+          Overall Status: {{ health_report.status | upper }}
+          Containers:
+            - Total: {{ health_report.containers.total }}
+            - Running: {{ health_report.containers.running }}
+            - Issues: {{ health_report.containers.issues }}
+          Networks:
+            - Required: {{ health_report.networks.required }}
+            - Found: {{ health_report.networks.found }}
+            - Missing: {{ health_report.networks.missing }}
+          {% if health_report.containers.issues > 0 %}
+          Containers with Issues:
+          {% for container in health_report.containers.details.restarting %}
+            - {{ container.name }}: {{ container.status }} (ExitCode: {{ container.exit_code }})
+          {% endfor %}
+          {% for container in health_report.containers.details.unhealthy %}
+            - {{ container.name }}: {{ container.health }}
+          {% endfor %}
+          {% endif %}
+          {% if health_report.networks.missing > 0 %}
+          Missing Networks:
+          {% for net in health_report.networks.details.missing %}
+            - {{ net }}
+          {% endfor %}
+          {% endif %}
+          Report saved to: /tmp/infrastructure_health.json
+          ================================================================================
+
+    - name: Fail if infrastructure is unhealthy
+      ansible.builtin.fail:
+        msg: "Infrastructure health check failed: {{ health_report.status }}"
+      when: health_report.status != 'healthy'
