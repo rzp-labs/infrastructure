@@ -23,3 +23,4 @@ ignore: |
   .venv/
   venv/
   .git/
+  collections/

@@ -110,9 +110,7 @@ def main():
     """Main entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Detect and categorize changed files for selective checks"
-    )
+    parser = argparse.ArgumentParser(description="Detect and categorize changed files for selective checks")
     parser.add_argument(
         "--base",
         default="origin/main",

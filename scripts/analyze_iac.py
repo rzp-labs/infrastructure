@@ -10,7 +10,6 @@ Performs static analysis on Ansible playbooks and Docker Compose files to assess
 """
 
 import json
-import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,9 +55,9 @@ class IaCAnalyzer:
     @staticmethod
     def _get_timestamp() -> str:
         """Get current UTC timestamp."""
-        from datetime import datetime
+        from datetime import datetime, UTC
 
-        return datetime.utcnow().isoformat() + "Z"
+        return datetime.now(UTC).isoformat() + "Z"
 
     def analyze_project(self, root_path: Path) -> AnalysisReport:
         """Analyze entire project."""
@@ -176,10 +175,7 @@ class IaCAnalyzer:
             # Check for proper module usage over shell
             if "shell" in task or "command" in task:
                 task_str = str(task)
-                if any(
-                    keyword in task_str
-                    for keyword in ["apt", "yum", "dnf", "pip", "systemctl", "service"]
-                ):
+                if any(keyword in task_str for keyword in ["apt", "yum", "dnf", "pip", "systemctl", "service"]):
                     self._add_issue(
                         playbook_path,
                         task_idx + 1,
@@ -376,7 +372,6 @@ class IaCAnalyzer:
 def main():
     """Main entry point."""
     import argparse
-    from datetime import datetime
 
     parser = argparse.ArgumentParser(description="Analyze Infrastructure-as-Code quality")
     parser.add_argument(
@@ -437,9 +432,9 @@ def main():
         print(f"\n✓ JSON report written to {args.output}")
 
     elif args.format == "text":
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("Infrastructure-as-Code Quality Report")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
         print(f"Files Analyzed: {report.files_analyzed}")
         print(f"Total Issues: {report.summary['total_issues']}\n")
         print("Scores:")
