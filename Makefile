@@ -1,8 +1,22 @@
 # Infrastructure Makefile
 # Pure Delegation Architecture: Provides standard targets (install, check, test)
 
-# Include Molecule dependency sync module
-include tools/molecule_sync.mk
+# Molecule scenarios (directories directly under molecule/)
+MOLECULE_SCENARIOS := $(shell find molecule -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+
+.PHONY: sync-molecule-deps
+sync-molecule-deps: requirements.yml ## Sync root requirements into Molecule scenarios
+	@if [ -z "$(MOLECULE_SCENARIOS)" ]; then \
+		echo "⚠️  No Molecule scenarios found; skipping dependency sync."; \
+	else \
+		echo "Syncing Molecule scenario requirements..."; \
+		for scenario in $(MOLECULE_SCENARIOS); do \
+			dest="molecule/$$scenario/requirements.yml"; \
+			cp requirements.yml "$$dest"; \
+			echo "  → $$dest"; \
+		done; \
+		echo "✅ Molecule requirements synced."; \
+	fi
 
 STACK_DIRS := $(shell find stacks -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 DEPLOY_STACK_TARGETS := $(addprefix deploy-,$(STACK_DIRS))
