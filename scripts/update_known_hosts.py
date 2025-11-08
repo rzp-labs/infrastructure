@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, Set
+from typing import Dict, Iterable, Set
 
 import yaml
 
@@ -15,22 +15,35 @@ INVENTORY_FILE = PROJECT_ROOT / "inventory" / "hosts.yml"
 KNOWN_HOSTS_FILE = PROJECT_ROOT / ".ssh" / "known_hosts"
 
 
-def load_inventory_hosts(inventory_path: Path) -> Set[str]:
+def load_inventory_hosts(inventory_path: Path) -> Dict[str, Set[str]]:
     if not inventory_path.exists():
         raise FileNotFoundError(f"Inventory file not found: {inventory_path}")
 
     with inventory_path.open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
 
-    hosts: Set[str] = set()
+    mapping: Dict[str, Set[str]] = {}
 
     def walk(node: object) -> None:
         if isinstance(node, dict):
             if "hosts" in node and isinstance(node["hosts"], dict):
                 for name, params in node["hosts"].items():
-                    hosts.add(str(name))
-                    if isinstance(params, dict) and params.get("ansible_host"):
-                        hosts.add(str(params["ansible_host"]))
+                    entry_names: Set[str] = set()
+                    entry_names.add(str(name))
+                    if isinstance(params, dict):
+                        ansible_host = params.get("ansible_host")
+                        ansible_host_ip = params.get("ansible_host_ip")
+                        if ansible_host:
+                            entry_names.add(str(ansible_host))
+                        if ansible_host_ip:
+                            entry_names.add(str(ansible_host_ip))
+                        scan_target = str(ansible_host_ip or ansible_host or name)
+                    else:
+                        scan_target = str(name)
+
+                    names = mapping.setdefault(scan_target, set())
+                    names.update(entry_names)
+                    names.add(scan_target)
             for child in node.values():
                 walk(child)
         elif isinstance(node, list):
@@ -38,12 +51,35 @@ def load_inventory_hosts(inventory_path: Path) -> Set[str]:
                 walk(item)
 
     walk(data)
-    return hosts
+    return mapping
+
+
+def resolve_ssh_hostname(host: str) -> str:
+    """Resolve hostname using SSH config if it's an alias."""
+    proc = subprocess.run(
+        ["ssh", "-G", host],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    
+    if proc.returncode != 0:
+        return host  # Fallback to original if resolution fails
+    
+    for line in proc.stdout.splitlines():
+        if line.startswith("hostname "):
+            return line.split(" ", 1)[1].strip()
+    
+    return host
 
 
 def ssh_keyscan(host: str) -> Iterable[str]:
+    # Resolve SSH config alias to actual hostname/IP
+    resolved_host = resolve_ssh_hostname(host)
+    
     proc = subprocess.run(
-        ["ssh-keyscan", "-H", host],
+        ["ssh-keyscan", resolved_host],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -51,30 +87,37 @@ def ssh_keyscan(host: str) -> Iterable[str]:
     )
 
     if proc.returncode != 0:
-        print(f"⚠️  ssh-keyscan failed for {host}: {proc.stderr.strip()}", file=sys.stderr)
+        print(f"⚠️  ssh-keyscan failed for {host} ({resolved_host}): {proc.stderr.strip()}", file=sys.stderr)
         return []
 
     lines = [line for line in proc.stdout.splitlines() if line and not line.startswith("#")] 
     if not lines:
-        print(f"⚠️  No host keys discovered for {host}", file=sys.stderr)
+        print(f"⚠️  No host keys discovered for {host} ({resolved_host})", file=sys.stderr)
     return lines
 
 
 def main() -> int:
-    hosts = sorted(load_inventory_hosts(INVENTORY_FILE))
-    if not hosts:
+    host_map = load_inventory_hosts(INVENTORY_FILE)
+    if not host_map:
         print("No hosts found in inventory; nothing to update.")
         return 0
 
     KNOWN_HOSTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     all_entries: list[str] = []
-    for host in hosts:
-        print(f"Gathering SSH keys for {host}...")
-        entries = list(ssh_keyscan(host))
+    for scan_target, names in sorted(host_map.items()):
+        print(f"Gathering SSH keys for {scan_target}...")
+        entries = list(ssh_keyscan(scan_target))
         if entries:
-            all_entries.append(f"# {host}")
-            all_entries.extend(entries)
+            all_entries.append(f"# {scan_target}")
+            for entry in entries:
+                try:
+                    host_field, remainder = entry.split(" ", 1)
+                except ValueError:
+                    continue
+                unique_names = {host_field, *names}
+                for name in sorted(unique_names):
+                    all_entries.append(f"{name} {remainder}")
 
     if not all_entries:
         print("⚠️  No host keys collected; known_hosts not modified.", file=sys.stderr)
