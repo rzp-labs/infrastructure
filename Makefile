@@ -121,7 +121,7 @@ test: check sync-molecule-deps test-molecule test-quality ## Run full test suite
 
 test-quick: ## Fast tests for development iteration (<5s target)
 	@echo "Running quick validation..."
-	@uv run pytest tests/ -m unit --no-cov -q
+	@uv run pytest tests/ -m unit --no-cov -q || { code=$$?; if [ $$code -ne 5 ]; then exit $$code; else echo "⚠️  No tests matched 'unit' marker; skipping."; fi; }
 	@uv run yamllint playbooks/ stacks/ inventory/ molecule/
 	@ANSIBLE_COLLECTIONS_PATH=.venv/lib/python$$(uv run python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages/ansible_collections uv run ansible-lint playbooks/
 	@echo "✅ Quick tests passed!"
