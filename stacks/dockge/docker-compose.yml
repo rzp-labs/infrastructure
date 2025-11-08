@@ -4,6 +4,9 @@ services:
     image: louislam/dockge:1
     container_name: dockge # Added a name for clarity
     restart: unless-stopped
+    depends_on:
+      docker-socket-proxy:
+        condition: service_started
     volumes:
       # Dockge data directory
       - ./data:/app/data
@@ -13,7 +16,7 @@ services:
       # Tell Dockge where is your stacks directory
       - DOCKGE_STACKS_DIR=/opt/stacks
       # Connect to the socket proxy service name and port 2375
-      - DOCKER_HOST=tcp://socket-proxy:2375
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
       # Ensure you include variables from your root .env file if needed
       - DOMAIN=${DOMAIN}
     networks:
