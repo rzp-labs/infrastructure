@@ -25,9 +25,9 @@ DOCKER_DEPLOY_STACK_TARGETS := $(addprefix docker-deploy-,$(STACK_DIRS))
 .PHONY: help install check test setup lint format ping deploy docker-deploy\
  				 check-deploy clean destroy-zitadel docker-install docker-destroy-all\
 				 docker-restart-all docker-stop-all docker-start-all docker-doctor\
-		 docker-deploy-all docker-bootstrap docker-check-health ssh-prime $(DEPLOY_STACK_TARGETS)\
-				 $(DOCKER_DEPLOY_STACK_TARGETS) check-deploy clean destroy bootstrap\
-				 test-molecule test-quality test-standards test-quick test-all\
+		 docker-deploy-all docker-bootstrap docker-check-health ssh-prime ssh-setup ssh-test\
+				 $(DEPLOY_STACK_TARGETS) $(DOCKER_DEPLOY_STACK_TARGETS) check-deploy clean destroy\
+				 bootstrap test-molecule test-quality test-standards test-quick test-all\
 				 test-coverage test-ci report clean-all $(DEPLOY_STACK_TARGETS)
 
 # Default target
@@ -178,7 +178,7 @@ docker-deploy: ## Deploy a stack (usage: make docker-deploy stack=<stack-name>)
 	fi
 	@echo "Deploying stack: $(stack)"
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-deploy-stack.yml -e "stack_name=$(stack)"
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-stack.yml -e "stack_name=$(stack)"
 
 deploy: ## [deprecated] Use docker-deploy instead
 	@$(MAKE) docker-deploy stack=$(stack)
@@ -186,17 +186,17 @@ deploy: ## [deprecated] Use docker-deploy instead
 docker-deploy-all: ## Deploy all stacks using root orchestrator
 	@echo "Deploying all stacks..."
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-deploy-all.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-all.yml
 
 docker-bootstrap: ## Bootstrap infrastructure with orchestrated deployment and OAuth setup
 	@echo "Bootstrapping infrastructure..."
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-bootstrap.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-bootstrap.yml
 
 docker-check-health: ## Check infrastructure health and report status
 	@echo "Checking infrastructure health..."
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-check-health.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-check-health.yml
 
 deploy-all: ## [deprecated] Use docker-deploy-all instead
 	@$(MAKE) docker-deploy-all
@@ -209,34 +209,34 @@ $(DOCKER_DEPLOY_STACK_TARGETS): ## Deploy specific stack via docker shortcut
 
 docker-install: ## Provision Docker engine and compose on homelab host
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-install.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-install.yml
 
 docker-start-all: ## Start all stacks via root orchestrator
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-deploy-all.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-all.yml
 
 docker-stop-all: ## Stop all stacks without removing volumes
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-deploy-all.yml --extra-vars "stack_state=stopped"
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-all.yml --extra-vars "stack_state=stopped"
 
 docker-restart-all: ## Restart all stacks via root orchestrator
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-deploy-all.yml --extra-vars "stack_state=restarted"
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-all.yml --extra-vars "stack_state=restarted"
 
 docker-destroy-all: ## Destroy all stacks and associated data (requires confirmation)
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-destroy-all.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-destroy-all.yml
 
 docker-doctor: ## Prune unused Docker artifacts on homelab host
 	uv run python scripts/update_known_hosts.py
-	uv run ansible-playbook playbooks/docker-doctor.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-doctor.yml
 
 ssh-prime: ## Refresh repo-managed SSH host fingerprints from inventory
 	uv run python scripts/update_known_hosts.py
 
 destroy-zitadel: ## Destroy Zitadel stack (prompts for confirmation)
 	@echo "Destroying Zitadel stack (you will be prompted to confirm)..."
-	uv run ansible-playbook playbooks/destroy-zitadel.yml
+	scripts/ansible_exec.sh ansible-playbook playbooks/destroy-zitadel.yml
 
 check-deploy: ## Validate deployment configuration (dry-run)
 	@echo "Validating deployment configuration..."
