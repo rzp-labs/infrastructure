@@ -253,6 +253,145 @@ SSL certificates automatically obtained via Let's Encrypt using Cloudflare DNS c
 4. Deploy: `make docker-deploy stack=my-service`
 5. Optionally add to root orchestrator's `include` list
 
+## SSH Configuration for Ansible
+
+### SSH Agent Forwarding Architecture
+
+The infrastructure uses **SSH agent forwarding with 1Password** for secure Ansible authentication:
+
+```
+1Password SSH Agent (macOS Host)
+    ↓ SSH_AUTH_SOCK forwarded by VSCode DevContainer
+DevContainer (Ansible)
+    ↓ SSH connection using forwarded agent
+Target Homelab Hosts
+```
+
+**Security Benefits:**
+- **No private keys in containers** - Authentication via forwarded agent only
+- **No private keys in repository** - Public repo safe, no secrets exposed
+- **Works across multiple hosts** - Same config on office and home Macs
+- **1Password native** - Keys sync across all your machines automatically
+
+**How it works:**
+1. DevContainer includes `ghcr.io/devcontainers/features/sshd:1` feature
+2. VSCode automatically forwards `SSH_AUTH_SOCK` to container
+3. Ansible uses forwarded agent via inventory configuration
+4. 1Password provides keys without exposing private key material
+
+### SSH Setup Process
+
+**Prerequisites:**
+1. **1Password SSH agent enabled** (Settings → Developer → Use SSH agent)
+2. **SSH keys in 1Password** (automatically synced across Macs)
+3. **DevContainer running** (SSH agent forwarding automatic)
+
+**First-time setup:**
+```bash
+# 1. Verify SSH agent forwarding works
+echo $SSH_AUTH_SOCK  # Should show /tmp/auth-agent.../listener.sock
+ssh-add -l           # Lists keys from 1Password
+
+# 2. Create inventory from template
+cp inventory/hosts.yml.example inventory/hosts.yml
+
+# 3. Edit inventory with your VM details and SSH config
+# (See example configuration below)
+
+# 4. Accept host keys on first connection
+make ping  # Type 'yes' when prompted
+```
+
+**Inventory configuration example:**
+```yaml
+---
+all:
+  children:
+    homelab:
+      hosts:
+        debian-docker:
+          ansible_host: 10.0.0.100
+          ansible_user: admin
+          ansible_python_interpreter: /usr/bin/python3
+          # SSH agent forwarding with 1Password
+          ansible_ssh_common_args: >-
+            -o IdentityAgent={{ lookup('env', 'SSH_AUTH_SOCK') }}
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile={{ playbook_dir }}/../.ssh/known_hosts
+```
+
+**Configuration explained:**
+- `IdentityAgent=$SSH_AUTH_SOCK` - Use forwarded 1Password agent
+- `IdentitiesOnly=yes` - Only try keys from agent (prevents exhaustion)
+- `StrictHostKeyChecking=yes` - Verify host keys for MITM protection
+- `UserKnownHostsFile=.ssh/known_hosts` - Workspace-local known hosts
+
+### Known Hosts Management
+
+SSH host keys are stored in `.ssh/known_hosts` (workspace-local, gitignored):
+
+**On first connection:**
+```bash
+make ping
+# Prompts: "Are you sure you want to continue connecting (yes/no)?"
+# Type: yes
+# Result: Host key saved to .ssh/known_hosts
+```
+
+**Subsequent connections:**
+- Automatically verify against saved host key
+- Connection fails if host key changes (MITM protection)
+
+**Regenerating known hosts:**
+```bash
+rm .ssh/known_hosts
+make ping  # Accept host keys again
+```
+
+**See:** [docs/SSH_SETUP.md](docs/SSH_SETUP.md) for complete SSH configuration guide.
+
+### Troubleshooting SSH
+
+**Common issues and solutions:**
+
+**"Permission denied (publickey)":**
+```bash
+# Check SSH agent forwarding
+echo $SSH_AUTH_SOCK  # Should be set
+ssh-add -l           # Should list keys
+
+# If empty: Enable 1Password SSH agent or restart DevContainer
+```
+
+**"Host key verification failed":**
+```bash
+# First connection: Run make ping
+make ping
+
+# Host key changed legitimately:
+ssh-keygen -R 10.0.0.100
+make ping
+
+# Host key changed unexpectedly: DO NOT PROCEED (possible MITM attack)
+```
+
+**"Too many authentication failures":**
+```bash
+# Solution: Add IdentitiesOnly=yes to inventory
+# (Already in example configuration)
+```
+
+**Multi-host development:**
+
+The same configuration works on multiple development machines (office + home):
+
+1. **On first Mac**: Complete setup, commit inventory to git
+2. **On second Mac**: Git pull, run `make ping` to accept host keys
+3. **Both Macs**: SSH connections work via 1Password agent
+
+Each workspace maintains its own `.ssh/known_hosts` file (gitignored).
+
 ## Configuration Management
 
 ### Inventory
@@ -262,7 +401,7 @@ Create `inventory/hosts.yml` from template:
 cp inventory/hosts.yml.example inventory/hosts.yml
 ```
 
-Edit with your VM details:
+Edit with your VM details (see SSH Configuration section above for complete example with SSH agent forwarding):
 ```yaml
 ansible_host: 10.0.0.100
 ansible_user: admin
@@ -280,6 +419,7 @@ ansible_user: admin
 - **Privilege escalation**: Automatically uses sudo
 - **Python interpreter**: Auto-detected (`auto_silent`)
 - **Host key checking**: Enabled (for security against MITM attacks)
+- **SSH authentication**: Via forwarded 1Password SSH agent
 
 ## Important Behaviors
 
