@@ -16,13 +16,16 @@ Infrastructure as Code for managing containerized services on a Debian VM in Pro
 ### Option 1: DevContainer (Recommended)
 - **VS Code** with "Dev Containers" extension
 - **Docker Desktop** running
-- **SSH keys** configured at `~/.ssh/`
+- **1Password SSH agent** enabled (for SSH authentication)
 
 All tools are pre-installed in the container. Just open in VS Code and select "Reopen in Container".
+
+**SSH Authentication:** The DevContainer uses SSH agent forwarding with 1Password. No SSH keys need to be copied into the container - your 1Password SSH agent handles authentication automatically.
 
 ### Option 2: Local Setup
 - **Local machine**: uv, shfmt, yamlfmt (optional)
 - **Debian VM**: SSH access configured
+- **1Password SSH agent**: Enabled for SSH authentication
 - **Cloudflare**: Domain and API token for DNS challenges
 - **Network**: Port forwarding for 80/443 to VM (if accessing externally)
 
@@ -34,7 +37,24 @@ All tools are pre-installed in the container. Just open in VS Code and select "R
 make setup  # Install Python deps + Ansible collections
 ```
 
-### 2. Configure Inventory
+### 2. Configure SSH Access
+
+The infrastructure uses **SSH agent forwarding with 1Password** for secure authentication:
+
+**Enable 1Password SSH agent** (one-time setup on macOS):
+1. Open 1Password → Settings → Developer
+2. Enable "Use the SSH agent"
+3. Add SSH keys to 1Password vault (syncs across your Macs)
+
+**Verify SSH agent works in DevContainer:**
+```bash
+echo $SSH_AUTH_SOCK  # Should show forwarded agent socket
+ssh-add -l           # Lists keys from 1Password
+```
+
+See [docs/SSH_SETUP.md](docs/SSH_SETUP.md) for complete SSH configuration guide.
+
+### 3. Configure Inventory
 
 Create your inventory file from the example:
 
@@ -47,11 +67,15 @@ Edit `inventory/hosts.yml` with your VM's IP address and SSH user:
 ```yaml
 ansible_host: 10.0.0.100  # Your VM's IP
 ansible_user: admin       # Your SSH user
+# SSH agent forwarding config (uses 1Password SSH agent)
+ansible_ssh_common_args: >-
+  -o IdentityAgent={{ lookup('env', 'SSH_AUTH_SOCK') }}
+  -o IdentitiesOnly=yes
+  -o StrictHostKeyChecking=yes
+  -o UserKnownHostsFile={{ playbook_dir }}/../.ssh/known_hosts
 ```
 
-**Note for 1Password users**: If using 1Password SSH agent with multiple keys, uncomment and configure the `ansible_ssh_common_args` line to specify your identity file.
-
-### 3. Verify SSH Connectivity
+### 4. Verify SSH Connectivity
 
 Test that you can reach the VM and accept its SSH host key:
 
@@ -59,20 +83,17 @@ Test that you can reach the VM and accept its SSH host key:
 make ping
 ```
 
-**First-time connection**: If you see a host key verification prompt, you'll need to accept the VM's SSH fingerprint. You can either:
-- Run the ping command and answer "yes" when prompted
-- Manually SSH once: `ssh admin@YOUR_VM_IP` (then exit)
-- For automated setup, temporarily disable checking: `ANSIBLE_HOST_KEY_CHECKING=False make ping`
+**First-time connection:** You'll be prompted to accept the VM's SSH fingerprint. Type `yes` to accept. The host key is saved to `.ssh/known_hosts` (gitignored) and all future connections verify against it for security.
 
-After the first connection, the host key is saved to `~/.ssh/known_hosts` and all future connections are verified against it for security.
+**Troubleshooting:** See [docs/SSH_SETUP.md](docs/SSH_SETUP.md#troubleshooting) for common SSH issues.
 
-### 4. Install Docker on VM
+### 5. Install Docker on VM
 
 ```bash
 make docker-install
 ```
 
-### 5. Deploy Docker Socket Proxy
+### 6. Deploy Docker Socket Proxy
 
 For security, deploy the socket proxy first:
 
@@ -80,7 +101,7 @@ For security, deploy the socket proxy first:
 make docker-deploy stack=docker-socket-proxy
 ```
 
-### 6. Configure Traefik
+### 7. Configure Traefik
 
 SSH to the VM and create `/opt/stacks/traefik/.env`:
 
@@ -98,13 +119,13 @@ DOMAIN=your-domain.com
 TZ=America/Phoenix
 ```
 
-### 7. Deploy Traefik
+### 8. Deploy Traefik
 
 ```bash
 make docker-deploy stack=traefik
 ```
 
-### 8. Configure DNS & Port Forwarding
+### 9. Configure DNS & Port Forwarding
 
 **DNS (Cloudflare):**
 - Create A record: `*.yourdomain.com` → Your public IP

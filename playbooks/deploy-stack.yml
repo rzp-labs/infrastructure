@@ -1,3 +1,0 @@
----
-- name: Legacy wrapper for docker-deploy-stack
-  import_playbook: docker-deploy-stack.yml

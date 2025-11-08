@@ -104,6 +104,64 @@ docker network create proxy  # Created by root orchestrator
 4. Deploy: `make docker-deploy stack=my-service`
 5. Optionally add to root orchestrator's `include` list
 
+## SSH Configuration
+
+### SSH Agent Forwarding Architecture
+
+The infrastructure uses **SSH agent forwarding with 1Password** for secure Ansible authentication:
+
+```
+1Password SSH Agent (macOS Host)
+    ↓ SSH_AUTH_SOCK forwarded by VSCode
+DevContainer (Ansible)
+    ↓ SSH connection using forwarded agent
+Target Homelab Hosts
+```
+
+**Key Points:**
+- Private keys NEVER stored in containers or repository
+- SSH agent automatically forwarded by DevContainer feature
+- Works across multiple development hosts (office + home Macs)
+- 1Password SSH keys sync across all your machines
+
+### SSH Setup for Users
+
+**Prerequisites:**
+1. Enable 1Password SSH agent (Settings → Developer)
+2. Add SSH keys to 1Password vault
+3. Configure inventory with SSH agent settings
+
+**Verification:**
+```bash
+echo $SSH_AUTH_SOCK  # Verify agent forwarding
+ssh-add -l           # List keys from 1Password
+make ping            # Test Ansible connectivity
+```
+
+**Complete guide:** [docs/SSH_SETUP.md](docs/SSH_SETUP.md)
+
+### Known Hosts Management
+
+SSH host keys are stored workspace-locally in `.ssh/known_hosts`:
+
+- **Gitignored** - Each workspace maintains its own known hosts
+- **Per-workspace** - Different workspaces can target different hosts
+- **Regenerable** - Can be deleted and recreated via `make ping`
+- **Security** - Provides MITM protection via StrictHostKeyChecking
+
+### Troubleshooting SSH
+
+**"Permission denied (publickey)":**
+- Verify `SSH_AUTH_SOCK` is set: `echo $SSH_AUTH_SOCK`
+- Check keys available: `ssh-add -l`
+- Ensure 1Password SSH agent is enabled
+
+**"Host key verification failed":**
+- First connection: Run `make ping` to accept host key
+- Host key changed: `ssh-keygen -R <host-ip>` then `make ping`
+
+**See:** [docs/SSH_SETUP.md#troubleshooting](docs/SSH_SETUP.md#troubleshooting) for complete troubleshooting guide.
+
 ## Configuration
 
 ### Inventory
@@ -117,6 +175,12 @@ Edit with your VM details:
 ```yaml
 ansible_host: 10.0.0.100
 ansible_user: admin
+# SSH agent forwarding (uses 1Password SSH agent)
+ansible_ssh_common_args: >-
+  -o IdentityAgent={{ lookup('env', 'SSH_AUTH_SOCK') }}
+  -o IdentitiesOnly=yes
+  -o StrictHostKeyChecking=yes
+  -o UserKnownHostsFile={{ playbook_dir }}/../.ssh/known_hosts
 ```
 
 ### Environment Variables
