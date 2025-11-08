@@ -101,7 +101,7 @@ For security, deploy the socket proxy first:
 make docker-deploy stack=docker-socket-proxy
 ```
 
-### 6. Configure Traefik
+### 7. Configure Traefik
 
 SSH to the VM and create `/opt/stacks/traefik/.env`:
 
@@ -119,13 +119,13 @@ DOMAIN=your-domain.com
 TZ=America/Phoenix
 ```
 
-### 7. Deploy Traefik
+### 8. Deploy Traefik
 
 ```bash
 make docker-deploy stack=traefik
 ```
 
-### 8. Configure DNS & Port Forwarding
+### 9. Configure DNS & Port Forwarding
 
 **DNS (Cloudflare):**
 - Create A record: `*.yourdomain.com` → Your public IP
