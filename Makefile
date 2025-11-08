@@ -146,7 +146,15 @@ lint: check ## Alias for check (backward compatibility)
 ping: ## Test SSH connectivity to VM
 	@echo "Testing VM connectivity..."
 	uv run python scripts/update_known_hosts.py
-	uv run ansible homelab -m ping
+	scripts/ansible_exec.sh ansible homelab -m ping
+
+.PHONY: ssh-setup
+ssh-setup: ## Run first-time SSH setup wizard
+	@bash scripts/ssh-setup.sh
+
+.PHONY: ssh-test
+ssh-test: ## Run SSH diagnostics
+	@$(UV_RUN) ansible-playbook playbooks/ssh-diagnose.yml
 
 docker-deploy: ## Deploy a stack (usage: make docker-deploy stack=<stack-name>)
 	@if [ -z "$(stack)" ]; then \

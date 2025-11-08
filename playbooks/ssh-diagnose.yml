@@ -1,0 +1,60 @@
+---
+- name: SSH Diagnostics
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Check SSH agent environment
+      ansible.builtin.debug:
+        msg: |
+          SSH Agent Status:
+            SSH_AUTH_SOCK: {{ lookup('env', 'SSH_AUTH_SOCK') | default('NOT SET') }}
+
+    - name: List SSH keys in agent
+      ansible.builtin.command: ssh-add -l
+      register: ssh_keys
+      changed_when: false
+      failed_when: false
+
+    - name: Display available SSH keys
+      ansible.builtin.debug:
+        msg: |
+          SSH Keys in Agent:
+          {{ ssh_keys.stdout_lines | default(['No keys found']) | join('\n') }}
+
+    - name: Check known_hosts file
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../.ssh/known_hosts"
+      register: known_hosts_stat
+
+    - name: Display known_hosts status
+      ansible.builtin.debug:
+        msg: |
+          Known Hosts File:
+            Path: {{ playbook_dir }}/../.ssh/known_hosts
+            Exists: {{ known_hosts_stat.stat.exists }}
+            {% if known_hosts_stat.stat.exists %}
+            Size: {{ known_hosts_stat.stat.size }} bytes
+            Permissions: {{ known_hosts_stat.stat.mode }}
+            {% endif %}
+
+- name: Test SSH connectivity to homelab hosts
+  hosts: homelab
+  gather_facts: false
+  tasks:
+    - name: Ping host
+      ansible.builtin.ping:
+      register: ping_result
+
+    - name: Display connectivity result
+      ansible.builtin.debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          IP: {{ ansible_host }}
+          User: {{ ansible_user }}
+          Status: {{ 'CONNECTED' if ping_result is success else 'FAILED' }}
+
+    - name: Show SSH connection details
+      ansible.builtin.debug:
+        msg: |
+          SSH Configuration:
+            ansible_ssh_common_args: {{ ansible_ssh_common_args | default('Not configured') }}
