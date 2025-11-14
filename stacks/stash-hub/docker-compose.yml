@@ -1,0 +1,22 @@
+name: stash-hub
+services:
+  stash-hub:
+    image: the-stash-hub:latest
+    ports:
+      - '7001:7001'
+    volumes:
+      - /mnt/user/appdata/the-stash-hub/data:/app/data
+      - /mnt/user/appdata/the-stash-hub/src/utils:/app/frontend/dist/utils:ro
+    environment:
+      - FLASK_APP=backend/app.py
+      - FLASK_ENV=production
+      - APP_FRONTEND_DIR=/app/frontend/dist
+      - APP_DATA_DIR=/app/data
+      - PYTHONPATH=/app/backend
+    restart: unless-stopped
+    networks:
+      - rzp-net
+
+networks:
+  rzp-net:
+    external: true

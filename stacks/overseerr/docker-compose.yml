@@ -1,0 +1,24 @@
+services:
+  overseerr:
+    image: sctx/overseerr:latest
+    container_name: overseerr
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 5055:5055
+    volumes:
+      - /mnt/user/appdata/overseerr:/app/config
+    environment:
+      - LOG_LEVEL=info
+      - UMASK=000
+      - PUID=99
+      - PGID=100
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:5055]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/diamkil/docker-templates/master/diamkil/images/os_logo_square.png
+
+networks:
+  rzp-net:
+    external: true

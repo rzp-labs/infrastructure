@@ -1,0 +1,40 @@
+services:
+  whisparr:
+    image: ghcr.io/hotio/whisparr:v3
+    container_name: whisparr
+    restart: unless-stopped
+    hostname: whisparr.internal
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    networks:
+      - rzp-net
+    ports:
+      - 6969:6969
+    volumes:
+      - /mnt/user/appdata/whisparr:/config
+      - /mnt/user/data:/data
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=0002
+      - PRIVOXY_ENABLED=false
+      - UNBOUND_ENABLED=false
+      - VPN_ENABLED=false
+      - VPN_CONF=wg0
+      - VPN_PROVIDER=generic
+      - VPN_AUTO_PORT_FORWARD=false
+      - VPN_KEEP_LOCAL_DNS=false
+      - VPN_FIREWALL_TYPE=auto
+      - VPN_PIA_DIP_TOKEN=no
+      - VPN_PIA_PORT_FORWARD_PERSIST=false
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:6969]/
+      - net.unraid.docker.icon=https://hotio.dev/webhook-avatars/whisparr.png
+
+networks:
+  rzp-net:
+    external: true

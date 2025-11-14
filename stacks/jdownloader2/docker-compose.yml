@@ -1,0 +1,39 @@
+services:
+  jdownloader2:
+    image: jlesage/jdownloader-2:latest
+    container_name: jdownloader2
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 7807:5800
+      - 7907:5900
+    volumes:
+      - /mnt/user/appdata/JDownloader2:/config
+      - /mnt/user/data/media/downloads:/output
+    environment:
+      - USER_ID=99
+      - GROUP_ID=100
+      - UMASK=0002
+      - DISPLAY_WIDTH=1920
+      - DISPLAY_HEIGHT=1080
+      - DARK_MODE=1
+      - WEB_AUDIO=0
+      - WEB_AUTHENTICATION=0
+      - SECURE_CONNECTION=0
+      - SECURE_CONNECTION_VNC_METHOD=SSL
+      - SECURE_CONNECTION_CERTS_CHECK_INTERVAL=60
+      - WEB_LISTENING_PORT=5800
+      - VNC_LISTENING_PORT=5900
+      - MYJDOWNLOADER_EMAIL=${MYJDOWNLOADER_EMAIL}
+      - MYJDOWNLOADER_PASSWORD=${MYJDOWNLOADER_PASSWORD}
+      - MYJDOWNLOADER_DEVICE_NAME=unRAID
+      - JDOWNLOADER_HEADLESS=0
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:7807]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/jlesage/docker-templates/master/jlesage/images/jdownloader-2-icon.png
+
+networks:
+  rzp-net:
+    external: true

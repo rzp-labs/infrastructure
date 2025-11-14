@@ -1,0 +1,24 @@
+services:
+  nzbhydra2:
+    image: lscr.io/linuxserver/nzbhydra2:latest
+    container_name: nzbhydra2
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 5076:5076
+    volumes:
+      - /mnt/user/appdata/nzbhydra2:/config
+      - /mnt/user/data/usenet:/data/downloads
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:5076]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/nzbhydra2-logo.png
+
+networks:
+  rzp-net:
+    external: true

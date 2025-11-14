@@ -1,0 +1,27 @@
+services:
+  fileflows:
+    image: revenz/fileflows:stable
+    container_name: fileflows
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 8585:5000
+    volumes:
+      - /mnt/user/appdata/fileflows/data:/app/Data
+      - /mnt/user/appdata/fileflows/logs:/app/Logs
+      - /mnt/user/temp/fileflows:/temp
+      - /mnt/user/data:/media
+    environment:
+      - TZ=America/Phoenix
+      - PUID=99
+      - PGID=100
+      - NVIDIA_VISIBLE_DEVICES=all
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:8585]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/revenz/FileFlowsUnraid/master/icon.png
+
+networks:
+  rzp-net:
+    external: true

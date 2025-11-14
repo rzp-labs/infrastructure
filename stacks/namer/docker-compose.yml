@@ -1,0 +1,73 @@
+services:
+  namer-sdb:
+    image: ghcr.io/rzp-labs/namer:latest
+    container_name: namer-sdb
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 6980:6980
+    devices:
+      - /dev/dri:/dev/dri # Map all DRM devices (supports iGPU + Arc)
+    group_add:
+      - "18" # video group for GPU access
+    volumes:
+      - /mnt/user/appdata/namer-sdb/config:/app/config
+      - /mnt/user/appdata/namer-sdb/database:/app/database
+      - /mnt/user/appdata/namer-sdb/logs:/app/logs
+      - /mnt/user/data/media/namer-sdb:/app/media
+    environment:
+      - NAMER_CONFIG=/app/config/namer-sdb.cfg
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=${UMASK}
+      - LIBVA_DRIVER_NAME=iHD
+      - TPDB_TOKEN=${TPDB_TOKEN}
+      - STASHDB_TOKEN=${STASHDB_TOKEN}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:6980/api/healthcheck || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+  # TPDB instance
+  namer-pdb:
+    image: ghcr.io/rzp-labs/namer:latest
+    container_name: namer-pdb
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 6981:6980
+    devices:
+      - /dev/dri:/dev/dri # Map all DRM devices (supports iGPU + Arc)
+    group_add:
+      - "18" # video group for GPU access
+    volumes:
+      - /mnt/user/appdata/namer-pdb/config:/app/config
+      - /mnt/user/appdata/namer-pdb/database:/app/database
+      - /mnt/user/appdata/namer-pdb/logs:/app/logs
+      - /mnt/user/data/media/namer-pdb:/app/media
+    environment:
+      - NAMER_CONFIG=/app/config/namer-pdb.cfg
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=${UMASK}
+      - LIBVA_DRIVER_NAME=iHD
+      - TPDB_TOKEN=${TPDB_TOKEN}
+      - STASHDB_TOKEN=${STASHDB_TOKEN}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:6980/api/healthcheck || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+networks:
+  rzp-net:
+    external: true

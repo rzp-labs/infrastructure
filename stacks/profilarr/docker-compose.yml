@@ -1,0 +1,23 @@
+services:
+  profilarr:
+    image: santiagosayshey/profilarr:latest
+    container_name: profilarr
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 6868:6868
+    volumes:
+      - /mnt/user/appdata/Profilarr:/config
+    environment:
+      - GIT_USER_NAME=${GIT_USER_NAME}
+      - GIT_USER_EMAIL=${GIT_USER_EMAIL}
+      - PROFILARR_PAT=${PROFILARR_PAT}
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:6868]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/Dictionarry-Hub/logo/refs/heads/main/profilarr/profilarr.png
+
+networks:
+  rzp-net:
+    external: true

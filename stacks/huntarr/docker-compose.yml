@@ -1,0 +1,21 @@
+services:
+  huntarr:
+    image: huntarr/huntarr:latest
+    container_name: huntarr
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 9705:9705
+    volumes:
+      - /mnt/user/appdata/Huntarr:/config
+    environment:
+      - BASE_URL=
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:9705]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/plexguide/Huntarr.io/main/frontend/static/logo/512.png
+
+networks:
+  rzp-net:
+    external: true

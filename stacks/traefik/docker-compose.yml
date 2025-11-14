@@ -21,6 +21,7 @@ services:
     ports:
       - 8080:80
       - 8443:443
+      - 8444:444
     environment:
       - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
       - ACME_EMAIL=${ACME_EMAIL}
@@ -29,8 +30,8 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./traefik.yml:/traefik.yml:ro
-      - ./acme.json:/acme.json
-      - ./config:/config:ro
+      - /opt/stacks/traefik/acme.json:/acme.json
+      - /opt/stacks/traefik/config:/config:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=http"
@@ -41,7 +42,7 @@ services:
       - "traefik.http.middlewares.traefik-auth.forwardauth.address=http://traefik-oauth2-proxy:4180"
       - "traefik.http.middlewares.traefik-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.middlewares.traefik-auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email"
-      - "traefik.http.routers.traefik-secure.entrypoints=https"
+      - "traefik.http.routers.traefik-secure.entrypoints=websecure"
       - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"
       - "traefik.http.routers.traefik-secure.tls=true"
       - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare"

@@ -9,10 +9,12 @@ entryPoints:
     http:
       redirections:
         entryPoint:
-          to: https
+          to: websecure
           scheme: https
-  https:
+  websecure:
     address: ":443"
+  internal:
+    address: ":444"
 
 providers:
   docker:

@@ -1,0 +1,19 @@
+services:
+  plex:
+    image: plexinc/pms-docker:latest
+    container_name: plex
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /mnt/user/appdata/Plex-Media-Server:/config
+      - /dev/shm/transcode:/transcode
+      - /mnt/user/data/media:/data/media
+    environment:
+      - PLEX_CLAIM=${PLEX_CLAIM}
+      - PLEX_UID=99
+      - PLEX_GID=100
+      - VERSION=latest
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:32400/web
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/plexinc/pms-docker/master/img/plex-server.png

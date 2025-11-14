@@ -1,0 +1,25 @@
+services:
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 8686:8686
+    volumes:
+      - /mnt/user/appdata/lidarr:/config
+      - /mnt/user/downloads/02_processing:/music
+      - /mnt/user/downloads/01_incomplete:/downloads
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:8686]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/lidarr-logo.png
+
+networks:
+  rzp-net:
+    external: true

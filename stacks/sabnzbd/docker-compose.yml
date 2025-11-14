@@ -1,0 +1,26 @@
+services:
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    restart: unless-stopped
+    networks:
+      - rzp-net
+    ports:
+      - 10000:8080
+    volumes:
+      - /mnt/user/appdata/sabnzbd:/config
+      - /mnt/user/data/usenet:/data/usenet
+      - /mnt/user/appdata/sabnzbd/scripts:/scripts
+    environment:
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+      - INSTALL_PACKAGES=clamav-daemon
+    labels:
+      - net.unraid.docker.managed=dockge
+      - net.unraid.docker.webui=http://[IP]:[PORT:10000]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/sabnzbd-logo.png
+
+networks:
+  rzp-net:
+    external: true

@@ -1,0 +1,37 @@
+services:
+  copyparty:
+    image: copyparty/iv:latest
+    container_name: copyparty
+    restart: unless-stopped
+    user: 99:100
+    networks:
+      - rzp-net
+    ports:
+      - 3923:3923
+    volumes:
+      - /mnt/user/appdata/copyparty/config:/cfg
+      - /mnt/user/data:/w
+    environment:
+      LD_PRELOAD: /usr/lib/libmimalloc-secure.so.2
+      PYTHONUNBUFFERED: 1
+    stop_grace_period: 15s
+    labels:
+      - net.unraid.docker.webui=http://[IP]:[PORT:3923]/
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/9001/copyparty/master/docs/ico/splash.png
+      - net.unraid.docker.managed=dockerman
+      - org.opencontainers.image.description=Portable file server with
+        accelerated resumable uploads
+      - org.opencontainers.image.title=CopyParty
+      - org.opencontainers.image.documentation=https://github.com/9001/copyparty
+      - org.opencontainers.image.source=https://github.com/9001/copyparty
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --spider -q 127.0.0.1:3923/?reset=/._
+      interval: 1m
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+networks:
+  rzp-net:
+    external: true
