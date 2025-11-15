@@ -82,7 +82,3 @@ services:
       - "traefik.http.routers.traefik-oauth2-proxy.tls=true"
       - "traefik.http.routers.traefik-oauth2-proxy.tls.certresolver=cloudflare"
       - "traefik.http.services.traefik-oauth2-proxy.loadbalancer.server.port=4180"
-
-networks:
-  traefik:
-  socket-proxy:

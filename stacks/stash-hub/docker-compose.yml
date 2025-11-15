@@ -1,12 +1,12 @@
-name: stash-hub
+---
 services:
   stash-hub:
     image: the-stash-hub:latest
-    ports:
-      - '7001:7001'
+    container_name: stash-hub
+    user: "99:100"
     volumes:
-      - /mnt/user/appdata/the-stash-hub/data:/app/data
-      - /mnt/user/appdata/the-stash-hub/src/utils:/app/frontend/dist/utils:ro
+      - /opt/stacks/stash-hub/data:/app/data
+      - /opt/stacks/stash-hub/src/utils:/app/frontend/dist/utils:ro
     environment:
       - FLASK_APP=backend/app.py
       - FLASK_ENV=production
@@ -15,8 +15,12 @@ services:
       - PYTHONPATH=/app/backend
     restart: unless-stopped
     networks:
-      - rzp-net
-
-networks:
-  rzp-net:
-    external: true
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.stash-hub.entrypoints=websecure"
+      - "traefik.http.routers.stash-hub.middlewares=internal-sso-chain@file"
+      - "traefik.http.routers.stash-hub.tls.certresolver=cloudflare"
+      - "traefik.http.routers.stash-hub.rule=Host(`hub.${DOMAIN}`)"
+      - "traefik.http.services.stash-hub.loadbalancer.server.port=7001"

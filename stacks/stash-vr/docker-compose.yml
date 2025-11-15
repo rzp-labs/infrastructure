@@ -1,4 +1,3 @@
-
 ---
 services:
   stash-vr:
@@ -35,6 +34,3 @@ services:
       - "traefik.http.routers.stash-vr.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash-vr.rule=Host(`vr.${DOMAIN}`)"
       - "traefik.http.services.stash-vr.loadbalancer.server.port=9666"
-
-networks:
-  traefik: {}

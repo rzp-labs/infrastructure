@@ -5,9 +5,7 @@ services:
     container_name: docker-socket-proxy
     restart: unless-stopped
     networks:
-      socket-proxy:
-        aliases:
-          - socket-proxy
+      - socket-proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -33,6 +31,3 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
-
-networks:
-  socket-proxy:

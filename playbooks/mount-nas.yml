@@ -1,0 +1,200 @@
+---
+- name: Prepare control node for NAS mount automation
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    nas_known_hosts_dir: "{{ lookup('env', 'HOME') }}/.ssh"
+    nas_known_hosts_file: "{{ nas_known_hosts_dir }}/known_hosts"
+    nas_known_hosts_targets: "{{ (groups.get('homelab', []) + ['nas']) | unique }}"
+
+  tasks:
+    - name: Ensure local known_hosts directory exists
+      ansible.builtin.file:
+        path: "{{ nas_known_hosts_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Cache host keys for target hosts
+      ansible.builtin.known_hosts:
+        name: "{{ hostvars[item].ansible_host }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan -t rsa,ecdsa,ed25519 ' + hostvars[item].ansible_host) }}"
+        path: "{{ nas_known_hosts_file }}"
+      loop: "{{ nas_known_hosts_targets }}"
+      loop_control:
+        label: "{{ item }}"
+      when: hostvars[item] is defined and (hostvars[item].ansible_host | default('')) | length > 0
+      changed_when: false
+
+- name: Ensure NAS automount is configured and healthy
+  hosts: docker
+  become: true
+  gather_facts: false
+
+  vars:
+    nas_mount_point: /mnt/nas/data
+    nas_export_path: /mnt/user/data
+    nas_remote_host: "{{ hostvars.get('nas', {}).ansible_host | default('') }}"
+    nas_remote: "{{ nas_remote_host }}:{{ nas_export_path }}"
+    nas_fstype: nfs
+    nas_mount_options:
+      - _netdev
+      - nofail
+      - hard
+      - intr
+      - rsize=1048576
+      - wsize=1048576
+    nas_automount_idle_timeout_sec: 600
+    nas_verify_writable: true
+
+  pre_tasks:
+    - name: Pre-check | Ensure NAS host definition exists
+      ansible.builtin.assert:
+        that:
+          - nas_remote_host | length > 0
+        fail_msg: "Inventory host 'nas' with ansible_host must be defined before running mount-nas"
+
+    - name: Pre-check | Verify NAS responds to ICMP
+      ansible.builtin.command:
+        cmd: "ping -c 1 -W 2 {{ nas_remote_host }}"
+      register: nas_ping_result
+      changed_when: false
+      retries: 3
+      delay: 2
+      until: nas_ping_result.rc == 0
+
+    - name: Pre-check | Ensure NAS NFS port is reachable
+      ansible.builtin.wait_for:
+        host: "{{ nas_remote_host }}"
+        port: 2049
+        timeout: 10
+        sleep: 2
+        state: started
+
+    - name: Derive systemd unit names for NAS mount
+      ansible.builtin.set_fact:
+        nas_unit_basename: "{{ nas_mount_point | regex_replace('^/', '') | regex_replace('/', '-') }}"
+        nas_mount_unit_path: "/etc/systemd/system/{{ nas_mount_point | regex_replace('^/', '') | regex_replace('/', '-') }}.mount"
+        nas_automount_unit_path: "/etc/systemd/system/{{ nas_mount_point | regex_replace('^/', '') | regex_replace('/', '-') }}.automount"
+        nas_mount_options_string: "{{ nas_mount_options | join(',') }}"
+
+  tasks:
+    - name: Prepare NAS mount point directory
+      block:
+        - name: Check existing NAS mount path
+          ansible.builtin.stat:
+            path: "{{ nas_mount_point }}"
+          register: nas_mount_stat
+
+        - name: Fail if NAS mount path exists but is not a directory
+          ansible.builtin.fail:
+            msg: "{{ nas_mount_point }} exists but is not a directory; remove or adjust it before running this playbook"
+          when: nas_mount_stat.stat.exists and not nas_mount_stat.stat.isdir
+
+        - name: Ensure NAS mount point exists
+          ansible.builtin.file:
+            path: "{{ nas_mount_point }}"
+            state: directory
+            mode: "0755"
+          when: not nas_mount_stat.stat.exists
+
+      rescue:
+        - name: Recover from stale NAS mount path handle
+          ansible.builtin.command:
+            cmd: "umount -fl {{ nas_mount_point }}"
+          register: nas_umount_recovery
+          changed_when: nas_umount_recovery.rc == 0
+          failed_when: nas_umount_recovery.rc not in [0, 32]
+
+        - name: Re-check NAS mount path after recovery
+          ansible.builtin.stat:
+            path: "{{ nas_mount_point }}"
+          register: nas_mount_stat
+
+        - name: Fail if NAS mount path exists but is not a directory (post-recovery)
+          ansible.builtin.fail:
+            msg: "{{ nas_mount_point }} exists but is not a directory even after recovery; remove or adjust it before running this playbook"
+          when: nas_mount_stat.stat.exists and not nas_mount_stat.stat.isdir
+
+        - name: Ensure NAS mount point exists after recovery
+          ansible.builtin.file:
+            path: "{{ nas_mount_point }}"
+            state: directory
+            mode: "0755"
+          when: not nas_mount_stat.stat.exists
+
+    - name: Deploy systemd mount unit for NAS share
+      ansible.builtin.copy:
+        dest: "{{ nas_mount_unit_path }}"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=NAS mount {{ nas_remote }} on {{ nas_mount_point }}
+          Wants=network-online.target remote-fs.target
+          After=network-online.target remote-fs.target
+
+          [Mount]
+          What={{ nas_remote }}
+          Where={{ nas_mount_point }}
+          Type={{ nas_fstype }}
+          Options={{ nas_mount_options_string }}
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Deploy systemd automount unit for NAS share
+      ansible.builtin.copy:
+        dest: "{{ nas_automount_unit_path }}"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=NAS automount {{ nas_remote }} on {{ nas_mount_point }}
+
+          [Automount]
+          Where={{ nas_mount_point }}
+          TimeoutIdleSec={{ nas_automount_idle_timeout_sec }}
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd to pick up NAS units
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and start NAS automount unit
+      ansible.builtin.systemd:
+        name: "{{ nas_unit_basename }}.automount"
+        enabled: true
+        state: started
+
+    - name: Ensure NAS mount is active
+      ansible.builtin.systemd:
+        name: "{{ nas_unit_basename }}.mount"
+        state: started
+
+    - name: Verify NAS path is reachable
+      ansible.builtin.command:
+        cmd: "mountpoint -q {{ nas_mount_point }}"
+      register: mountpoint_result
+      changed_when: false
+      failed_when: mountpoint_result.rc != 0
+
+    - name: Verify NAS path is writable
+      when: nas_verify_writable | bool
+      block:
+        - name: Write probe file to NAS mount
+          ansible.builtin.copy:
+            dest: "{{ nas_mount_point }}/.ansible-write-check"
+            content: "{{ lookup('pipe', 'date -Iseconds') }}\n"
+            mode: "0600"
+          register: nas_write_probe
+
+        - name: Remove NAS write probe file
+          ansible.builtin.file:
+            path: "{{ nas_mount_point }}/.ansible-write-check"
+            state: absent
+          when: nas_write_probe is succeeded
+
+    - name: Record successful NAS mount setup
+      ansible.builtin.debug:
+        msg: "NAS share {{ nas_remote }} is mounted at {{ nas_mount_point }} via systemd automount"

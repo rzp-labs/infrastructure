@@ -43,6 +43,3 @@ services:
       - "traefik.http.routers.stash.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash.rule=Host(`stash.${DOMAIN}`)"
       - "traefik.http.services.stash.loadbalancer.server.port=9999"
-
-networks:
-  traefik:
