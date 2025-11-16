@@ -7,6 +7,8 @@ services:
     depends_on:
       docker-socket-proxy:
         condition: service_started
+      traefik-oauth2-proxy:
+        condition: service_started
     security_opt:
       - no-new-privileges:true
     command:
@@ -31,24 +33,17 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./traefik.yml:/traefik.yml:ro
       - /opt/stacks/traefik/acme.json:/acme.json
-      - /opt/stacks/traefik/config:/config:ro
+      - ./config:/config:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=http"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
-      - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https"
-      - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
-      - "traefik.http.middlewares.traefik-auth.forwardauth.address=http://traefik-oauth2-proxy:4180"
-      - "traefik.http.middlewares.traefik-auth.forwardauth.trustForwardHeader=true"
-      - "traefik.http.middlewares.traefik-auth.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email"
       - "traefik.http.routers.traefik-secure.entrypoints=websecure"
       - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`)"
-      - "traefik.http.routers.traefik-secure.tls=true"
       - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare"
       - "traefik.http.routers.traefik-secure.tls.domains[0].main=${DOMAIN}"
       - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.${DOMAIN}"
-      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.traefik-secure.middlewares=sso-forward-auth@file"
       - "traefik.http.routers.traefik-secure.service=api@internal"
 
   traefik-oauth2-proxy:
@@ -77,8 +72,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.traefik-oauth2-proxy.entrypoints=https"
-      - "traefik.http.routers.traefik-oauth2-proxy.rule=Host(`traefik.${DOMAIN}`) && PathPrefix(`/oauth2`)"
-      - "traefik.http.routers.traefik-oauth2-proxy.tls=true"
+      - "traefik.http.routers.traefik-oauth2-proxy.entrypoints=websecure"
       - "traefik.http.routers.traefik-oauth2-proxy.tls.certresolver=cloudflare"
+      - "traefik.http.routers.traefik-oauth2-proxy.rule=Host(`traefik.${DOMAIN}`) && PathPrefix(`/oauth2`)"
       - "traefik.http.services.traefik-oauth2-proxy.loadbalancer.server.port=4180"

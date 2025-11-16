@@ -22,7 +22,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dockge.entrypoints=websecure"
-      - "traefik.http.routers.dockge.middlewares=sso_forward-auth@file"
+      - "traefik.http.routers.dockge.middlewares=chain-sso-internal@file"
       - "traefik.http.routers.dockge.tls.certresolver=cloudflare"
       - "traefik.http.routers.dockge.rule=Host(`dockge.${DOMAIN}`)"
       - "traefik.http.services.dockge.loadbalancer.server.port=5001"

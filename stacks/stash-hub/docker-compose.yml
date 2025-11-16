@@ -20,7 +20,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.stash-hub.entrypoints=websecure"
-      - "traefik.http.routers.stash-hub.middlewares=internal-sso-chain@file"
+      - "traefik.http.routers.stash-hub.middlewares=chain-sso-internal@file"
       - "traefik.http.routers.stash-hub.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash-hub.rule=Host(`hub.${DOMAIN}`)"
       - "traefik.http.services.stash-hub.loadbalancer.server.port=7001"

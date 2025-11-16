@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     depends_on:
       zitadel-db:
-        condition: service_healthy
+        condition: service_started
     command:
       - "${ZITADEL_COMMAND:-start}"
       - --masterkeyFromEnv
@@ -79,7 +79,7 @@ services:
       - "traefik.http.services.zitadel.loadbalancer.server.port=8080"
       - "traefik.http.services.zitadel.loadbalancer.server.scheme=h2c"
       - "traefik.http.routers.zitadel.priority=10"
-      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && !PathPrefix(`/ui/v2/login`)"
+      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && !PathPrefix(`/ui/login`) && !PathPrefix(`/ui/v2/login`)"
 
   zitadel-login:
     image: ghcr.io/zitadel/zitadel-login:latest
@@ -90,7 +90,7 @@ services:
         condition: service_started
     environment:
       - ZITADEL_API_URL=http://zitadel:${ZITADEL_SERVER_PORT}
-      - NEXT_PUBLIC_BASE_PATH=/ui/v2/login
+      - NEXT_PUBLIC_BASE_PATH=/ui/login
       - ZITADEL_SERVICE_USER_TOKEN_FILE=/zitadel/login-client.pat
       - CUSTOM_REQUEST_HEADERS=Host:${ZITADEL_PUBLIC_DOMAIN}
     volumes:
@@ -102,7 +102,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.zitadel-login.entrypoints=websecure"
-      - "traefik.http.routers.zitadel-login.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && PathPrefix(`/ui/v2/login`)"
+      - "traefik.http.routers.zitadel-login.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && PathPrefix(`/ui/login`)"
       - "traefik.http.routers.zitadel-login.tls=true"
       - "traefik.http.routers.zitadel-login.tls.certresolver=cloudflare"
       - "traefik.http.routers.zitadel-login.priority=20"

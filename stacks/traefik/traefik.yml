@@ -13,12 +13,17 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
+    http:
+      tls:
+        certResolver: cloudflare
   internal:
     address: ":444"
-
+    http:
+      tls:
+        certResolver: cloudflare
 providers:
   docker:
-    endpoint: "tcp://socket-proxy:2375"
+    endpoint: "tcp://docker-socket-proxy:2375"
     exposedByDefault: false
     network: traefik
   file:
