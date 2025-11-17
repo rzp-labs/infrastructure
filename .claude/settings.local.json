@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Read(//home/vscode/go/bin/**)",
+      "Bash(~/go/bin/shfmt:*)",
+      "Bash(~/go/bin/yamlfmt:*)",
+      "Read(//proc/**)",
+      "Bash(printenv:*)",
+      "Bash(make lint:*)",
+      "Bash(make format:*)",
+      "Bash(bash:*)",
+      "Bash(cat:*)",
+      "Read(//home/vscode/**)",
+      "Bash(make deploy-all:*)",
+      "Bash(uv run:*)",
+      "Bash(make deploy:*)",
+      "Bash(rsync:*)",
+      "Bash(dig:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "defaultMode": "bypassPermissions"
+  }
+}
