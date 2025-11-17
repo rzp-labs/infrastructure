@@ -79,7 +79,7 @@ services:
       - "traefik.http.services.zitadel.loadbalancer.server.port=8080"
       - "traefik.http.services.zitadel.loadbalancer.server.scheme=h2c"
       - "traefik.http.routers.zitadel.priority=10"
-      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && !PathPrefix(`/ui/login`) && !PathPrefix(`/ui/v2/login`)"
+      - "traefik.http.routers.zitadel.rule=Host(`login.${DOMAIN}`) && !PathPrefix(`/ui/login`) && !PathPrefix(`/ui/v2/login`)"
 
   zitadel-login:
     image: ghcr.io/zitadel/zitadel-login:latest
@@ -102,7 +102,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.zitadel-login.entrypoints=websecure"
-      - "traefik.http.routers.zitadel-login.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && PathPrefix(`/ui/login`)"
+      - "traefik.http.routers.zitadel-login.rule=Host(`login.${DOMAIN}`) && PathPrefix(`/ui/login`)"
       - "traefik.http.routers.zitadel-login.tls=true"
       - "traefik.http.routers.zitadel-login.tls.certresolver=cloudflare"
       - "traefik.http.routers.zitadel-login.priority=20"
