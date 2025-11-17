@@ -66,16 +66,16 @@ services:
       - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD=${ZITADEL_ADMIN_PASSWORD}
       - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED=false
     volumes:
-      - /opt/stacks/zitadel/config:/zitadel
+      - ./config:/zitadel
     networks:
       - zitadel
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.zitadel.entrypoints=https"
       - "traefik.http.routers.zitadel.tls=true"
-      - "traefik.http.routers.zitadel.entrypoints=websecure"
       - "traefik.http.routers.zitadel.tls.certresolver=cloudflare"
+      - "traefik.docker.network=traefik"
       - "traefik.http.services.zitadel.loadbalancer.server.port=8080"
       - "traefik.http.services.zitadel.loadbalancer.server.scheme=h2c"
       - "traefik.http.routers.zitadel.priority=10"
@@ -94,14 +94,14 @@ services:
       - ZITADEL_SERVICE_USER_TOKEN_FILE=/zitadel/login-client.pat
       - CUSTOM_REQUEST_HEADERS=Host:${ZITADEL_PUBLIC_DOMAIN}
     volumes:
-      - /opt/stacks/zitadel/config:/zitadel:ro
+      - ./config:/zitadel:ro
     networks:
       - traefik
       - zitadel
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.zitadel-login.entrypoints=websecure"
+      - "traefik.http.routers.zitadel-login.entrypoints=https"
       - "traefik.http.routers.zitadel-login.rule=Host(`${ZITADEL_PUBLIC_DOMAIN}`) && PathPrefix(`/ui/v2/login`)"
       - "traefik.http.routers.zitadel-login.tls=true"
       - "traefik.http.routers.zitadel-login.tls.certresolver=cloudflare"
@@ -114,3 +114,4 @@ volumes:
 networks:
   zitadel:
     internal: true
+  traefik:

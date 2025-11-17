@@ -12,7 +12,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 INVENTORY_FILE = PROJECT_ROOT / "inventory" / "hosts.yml"
-KNOWN_HOSTS_FILE = PROJECT_ROOT / ".ssh" / "known_hosts"
+KNOWN_HOSTS_FILE = Path.home() / ".ssh" / "known_hosts"
 
 
 def load_inventory_hosts(inventory_path: Path) -> Dict[str, Set[str]]:
@@ -54,9 +54,32 @@ def load_inventory_hosts(inventory_path: Path) -> Dict[str, Set[str]]:
     return mapping
 
 
-def ssh_keyscan(host: str) -> Iterable[str]:
+def resolve_ssh_hostname(host: str) -> str:
+    """Resolve hostname using SSH config if it's an alias."""
     proc = subprocess.run(
-        ["ssh-keyscan", host],
+        ["ssh", "-G", host],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    
+    if proc.returncode != 0:
+        return host  # Fallback to original if resolution fails
+    
+    for line in proc.stdout.splitlines():
+        if line.startswith("hostname "):
+            return line.split(" ", 1)[1].strip()
+    
+    return host
+
+
+def ssh_keyscan(host: str) -> Iterable[str]:
+    # Resolve SSH config alias to actual hostname/IP
+    resolved_host = resolve_ssh_hostname(host)
+    
+    proc = subprocess.run(
+        ["ssh-keyscan", resolved_host],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -64,12 +87,12 @@ def ssh_keyscan(host: str) -> Iterable[str]:
     )
 
     if proc.returncode != 0:
-        print(f"⚠️  ssh-keyscan failed for {host}: {proc.stderr.strip()}", file=sys.stderr)
+        print(f"⚠️  ssh-keyscan failed for {host} ({resolved_host}): {proc.stderr.strip()}", file=sys.stderr)
         return []
 
     lines = [line for line in proc.stdout.splitlines() if line and not line.startswith("#")] 
     if not lines:
-        print(f"⚠️  No host keys discovered for {host}", file=sys.stderr)
+        print(f"⚠️  No host keys discovered for {host} ({resolved_host})", file=sys.stderr)
     return lines
 
 

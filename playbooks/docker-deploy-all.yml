@@ -65,3 +65,6 @@
         project_name: "{{ root_project_name }}"
         state: "{{ stack_state }}"
         pull: "{{ 'always' if stack_state == 'present' else 'missing' }}"
+        networks:
+          socket-proxy:
+            external: true
