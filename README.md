@@ -8,8 +8,9 @@ Infrastructure as Code for managing containerized services on a Debian VM in Pro
 - **Host**: Debian VM
 - **Container Runtime**: Docker + Docker Compose (standalone)
 - **Reverse Proxy**: Traefik v3 with Cloudflare DNS challenge for SSL
-- **Security**: Docker Socket Proxy (restricted API access)
-- **Configuration Management**: Ansible
+- **Authentication**: Zitadel OIDC + oauth2-proxy (single sign-on gateway)
+- **Security**: Docker Socket Proxy (restricted API access), network isolation
+- **Configuration Management**: Ansible with Molecule testing
 
 ## Prerequisites
 
@@ -101,7 +102,7 @@ For security, deploy the socket proxy first:
 make docker-deploy stack=docker-socket-proxy
 ```
 
-### 7. Configure Traefik
+### 7. Configure Traefik and Authentication
 
 SSH to the VM and create `/opt/stacks/traefik/.env`:
 
@@ -113,11 +114,19 @@ sudo nano /opt/stacks/traefik/.env
 
 Add:
 ```bash
+# Cloudflare DNS Challenge
 CF_DNS_API_TOKEN=your_cloudflare_dns_api_token
 CF_API_EMAIL=your_email@example.com
 DOMAIN=your-domain.com
 TZ=America/Phoenix
+
+# OAuth2 Proxy (authentication gateway)
+OAUTH2_PROXY_CLIENT_ID=<from-zitadel>
+OAUTH2_PROXY_CLIENT_SECRET=<from-zitadel>
+OAUTH2_PROXY_COOKIE_SECRET=<random-32-bytes>
 ```
+
+**Note**: OAuth credentials are created automatically by the bootstrap process. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for complete authentication setup.
 
 ### 8. Deploy Traefik
 
@@ -136,8 +145,10 @@ make docker-deploy stack=traefik
 - Forward port 443 (HTTPS) → YOUR_VM_IP:443
 
 **Access Traefik Dashboard:**
-- Local: `http://YOUR_VM_IP:8080/dashboard/`
-- External: `https://traefik.yourdomain.com`
+- External: `https://traefik.yourdomain.com` (requires authentication)
+- Login page: `https://login.yourdomain.com`
+
+All services are protected by authentication. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for the complete authentication architecture.
 
 ## Automated Bootstrap (NEW)
 
@@ -270,18 +281,18 @@ uv run ansible homelab -a "df -h"
 
 ### Testing
 
-The project uses a comprehensive test suite to ensure IaC quality and reliability:
+The project uses a comprehensive test suite including Molecule for infrastructure testing:
 
 ```bash
 make test          # Run full test suite (linting + Molecule + quality checks)
 make test-quick    # Fast tests only (<5s: pytest + linting)
-make test-molecule # Integration tests with idempotence verification
+make test-molecule # Molecule integration tests with authentication verification
 make test-quality  # IaC quality analysis on analyze_iac.py
 ```
 
-**Test coverage**: 80% on critical Python scripts (analyze_iac.py), with a balanced test distribution optimized for IaC: 60% static analysis, 30% integration tests via Molecule, 10% end-to-end deployment validation.
+**Molecule Testing**: Infrastructure changes are validated locally in Docker containers before deploying to production. Tests verify complete deployment, service health, authentication flow, and network isolation.
 
-See [docs/TEST_STRATEGY.md](docs/TEST_STRATEGY.md) and [tests/README.md](tests/README.md) for complete testing documentation.
+See [docs/TESTING.md](docs/TESTING.md) for Molecule workflow and [docs/TEST_STRATEGY.md](docs/TEST_STRATEGY.md) for overall testing strategy.
 
 ### Linting & Formatting
 
@@ -300,11 +311,19 @@ make format  # Auto-format YAML and shell scripts
 - **pytest**: Python unit testing framework
 - **Molecule**: Ansible integration testing with Docker
 
-## Notes
+## Key Documentation
 
-- Stacks deploy to `/opt/stacks/<stack-name>/` on the VM
-- `.env` files are NOT synced - create them on the VM manually via SSH
-- The `proxy` network is created automatically when deploying Traefik
-- Use `.env.example` files to document required variables for each stack
-- Docker socket access is proxied through `docker-socket-proxy` for security
-- Traefik dashboard is accessible on port 8080 (local) or via domain (SSL)
+- **[docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)** - Complete authentication architecture and flow
+- **[docs/TESTING.md](docs/TESTING.md)** - Molecule testing workflow for local validation
+- **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** - Detailed setup instructions
+- **[docs/STANDARDS.md](docs/STANDARDS.md)** - Infrastructure coding standards
+
+## Architecture Notes
+
+- **Authentication**: All services protected via oauth2-proxy + Zitadel OIDC at `login.yourdomain.com`
+- **Network Isolation**: Zitadel and databases run on internal networks only
+- **Single Entry Point**: Only Traefik exposed externally (ports 80/443)
+- **Stacks Location**: Deploy to `/opt/stacks/<stack-name>/` on the VM
+- **Environment Files**: `.env` files NOT synced - create on VM manually via SSH
+- **Security**: Docker socket access proxied through docker-socket-proxy for restricted API access
+- **Testing**: Molecule validates playbooks locally before remote deployment

@@ -38,6 +38,37 @@
           }) }}
       changed_when: false
 
+    - name: Check oauth2-proxy health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:4180/ping"
+        status_code: 200
+      register: oauth2_health
+      retries: 5
+      delay: 2
+      until: oauth2_health is succeeded
+      ignore_errors: true
+
+    - name: Verify Zitadel NOT accessible externally
+      ansible.builtin.wait_for:
+        port: 8080
+        host: 0.0.0.0
+        state: stopped
+        timeout: 5
+      ignore_errors: true
+      register: zitadel_external
+      failed_when: zitadel_external is succeeded
+
+    - name: Verify oauth2-proxy OIDC discovery
+      ansible.builtin.uri:
+        url: "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one') }}/.well-known/openid-configuration"
+        status_code: 200
+        validate_certs: false
+      retries: 5
+      delay: 2
+      until: oidc_discovery is succeeded
+      register: oidc_discovery
+      ignore_errors: true
+
     - name: Get network status
       ansible.builtin.command: docker network ls --format json
       register: networks_raw

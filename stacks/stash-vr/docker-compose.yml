@@ -30,7 +30,9 @@ services:
       #FORCE_HTTPS: "true"
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
       - "traefik.http.routers.stash-vr.entrypoints=websecure"
+      - "traefik.http.routers.stash-vr.middlewares=chain-sso-internal@file"
       - "traefik.http.routers.stash-vr.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash-vr.rule=Host(`vr.${DOMAIN}`)"
       - "traefik.http.services.stash-vr.loadbalancer.server.port=9666"
