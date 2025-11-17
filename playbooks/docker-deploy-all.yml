@@ -68,8 +68,3 @@
         networks:
           socket-proxy:
             external: true
-      community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dir }}"
-        project_name: "{{ root_project_name }}"
-        state: "{{ stack_state }}"
-        pull: "{{ 'always' if stack_state == 'present' else 'missing' }}"
