@@ -276,7 +276,7 @@ If you need to create the OAuth application manually:
 4. Create new application:
    - **Name**: oauth2-proxy
    - **Type**: Web Application
-   - **Redirect URI**: `https://login.rzp.one/oauth2/callback`
+   - **Redirect URI**: `https://login.${DOMAIN}/oauth2/callback`
    - **Scopes**: `openid`, `profile`, `email`
 5. Save the **Client ID** and **Client Secret**
 6. Add credentials to `stacks/traefik/.env`

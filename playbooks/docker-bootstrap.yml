@@ -184,6 +184,13 @@
       register: cookie_secret
       changed_when: false
 
+    - name: Proxy stage | Save OAuth2 cookie secret to .env
+      ansible.builtin.lineinfile:
+        path: "{{ stacks_dir }}/traefik/.env"
+        regexp: '^OAUTH2_PROXY_COOKIE_SECRET='
+        line: "OAUTH2_PROXY_COOKIE_SECRET={{ cookie_secret.stdout }}"
+        create: yes
+
     - name: Proxy stage | Ensure zitadel network exists
       community.docker.docker_network:
         name: zitadel
