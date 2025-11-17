@@ -179,6 +179,17 @@
     # Stage 3: Proxy Layer - Deploy Traefik and OAuth2 proxy
     # ==============================================================================
 
+    - name: Proxy stage | Generate OAuth2 cookie secret
+      ansible.builtin.command: python3 -c 'import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
+      register: cookie_secret
+      changed_when: false
+
+    - name: Proxy stage | Ensure zitadel network exists
+      community.docker.docker_network:
+        name: zitadel
+        internal: true
+        state: present
+
     - name: Proxy stage | Deploy Traefik with OAuth
       community.docker.docker_compose_v2:
         project_src: "{{ stacks_dir }}"
