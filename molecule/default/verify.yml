@@ -4,7 +4,7 @@
 
 - name: Verify
   hosts: all
-  gather_facts: false
+  gather_facts: true  # Need facts for ansible_default_ipv4
   become: true
 
   tasks:
@@ -40,3 +40,36 @@
           - "✓ Test directory exists"
           - "✓ Test file exists with correct content"
           - "✓ Python is installed: {{ python_version.stdout }}"
+
+    # === SECURITY TEST DOCUMENTATION ===
+    # The following security tests are documented here for implementation in actual deployments.
+    # Molecule tests verify Ansible playbook syntax and basic infrastructure, not runtime security.
+    #
+    # CRITICAL SECURITY TESTS (to be implemented in deployment verification):
+    #
+    # 1. Zitadel External Access Verification
+    #    - Verify Zitadel is NOT accessible from external network
+    #    - Test: wait_for host={{ ansible_default_ipv4.address }} port=8080 state=stopped timeout=3
+    #    - Expected: Connection timeout (port closed externally)
+    #    - Risk: Authentication secrets exposed if accessible
+    #
+    # 2. OAuth2-Proxy Health Endpoint
+    #    - Verify oauth2-proxy is responding to health checks
+    #    - Test: uri url=http://localhost:4180/ping status_code=200
+    #    - Expected: HTTP 200 response
+    #    - Risk: Authentication layer down without detection
+    #
+    # 3. Internal Network Isolation
+    #    - Verify zitadel network is configured as internal-only
+    #    - Test: docker network inspect zitadel --format '{{.Internal}}'
+    #    - Expected: Output 'true'
+    #    - Risk: Unintended network access paths
+    #
+    # NOTE: These tests require actual service deployment and should be run as post-deployment
+    #       validation, not in Molecule's limited test container environment.
+
+    - name: Display security test requirements
+      ansible.builtin.debug:
+        msg:
+          - "Security tests documented in verify.yml for deployment validation"
+          - "See comments above for 3 critical security tests to implement"
