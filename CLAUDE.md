@@ -36,18 +36,19 @@ make install        # Install Python deps + Ansible collections
 make check          # Run linting (YAML + Ansible + shell scripts)
 make test           # Validate Ansible playbooks and configuration
 
-# Backward-compatible aliases
-make setup          # Alias for install
-make lint           # Alias for check
+# SSH connectivity
+make ssh-check      # Test VM connectivity
+make ssh-setup      # First-time SSH setup wizard
 
-# Connectivity and deployment
-make ping           # Test VM connectivity
+# Docker operations
 make docker-deploy stack=<name>  # Deploy single stack
-make check-deploy   # Validate deployment configuration
+make docker-deploy-all           # Deploy all stacks
+make docker-bootstrap            # Bootstrap infrastructure
+make docker-health               # Check infrastructure health
 
 # Development
-make format         # Auto-format YAML and shell scripts
-make clean          # Remove temporary files
+make dev-format     # Auto-format YAML and shell scripts
+make dev-clean      # Remove temporary files
 ```
 
 ## Architecture Patterns
@@ -135,7 +136,7 @@ Target Homelab Hosts
 ```bash
 echo $SSH_AUTH_SOCK  # Verify agent forwarding
 ssh-add -l           # List keys from 1Password
-make ping            # Test Ansible connectivity
+make ssh-check            # Test Ansible connectivity
 ```
 
 **Complete guide:** [docs/SSH_SETUP.md](docs/SSH_SETUP.md)
@@ -146,7 +147,7 @@ SSH host keys are stored workspace-locally in `.ssh/known_hosts`:
 
 - **Gitignored** - Each workspace maintains its own known hosts
 - **Per-workspace** - Different workspaces can target different hosts
-- **Regenerable** - Can be deleted and recreated via `make ping`
+- **Regenerable** - Can be deleted and recreated via `make ssh-check`
 - **Security** - Provides MITM protection via StrictHostKeyChecking
 
 ### Troubleshooting SSH
@@ -157,8 +158,8 @@ SSH host keys are stored workspace-locally in `.ssh/known_hosts`:
 - Ensure 1Password SSH agent is enabled
 
 **"Host key verification failed":**
-- First connection: Run `make ping` to accept host key
-- Host key changed: `ssh-keygen -R <host-ip>` then `make ping`
+- First connection: Run `make ssh-check` to accept host key
+- Host key changed: `ssh-keygen -R <host-ip>` then `make ssh-check`
 
 **See:** [docs/SSH_SETUP.md#troubleshooting](docs/SSH_SETUP.md#troubleshooting) for complete troubleshooting guide.
 
@@ -218,7 +219,7 @@ uv run ansible-playbook playbooks/deploy-stack.yml
 - `ansible.posix` - Synchronize module for rsync
 - `geerlingguy.docker` - Docker installation role
 
-Install with: `make install` (or `make setup` - backward-compatible alias)
+Install with: `make install`
 
 ## Linting
 
@@ -229,4 +230,4 @@ Configured tools:
 - **shfmt** - Shell script formatting
 - **EditorConfig** - Editor consistency
 
-Run via `make check` (or `make lint` - backward-compatible alias) for linting, `make format` for auto-formatting
+Run via `make check` for linting, `make dev-format` for auto-formatting

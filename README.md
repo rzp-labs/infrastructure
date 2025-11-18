@@ -35,7 +35,7 @@ All tools are pre-installed in the container. Just open in VS Code and select "R
 ### 1. Setup Local Environment
 
 ```bash
-make setup  # Install Python deps + Ansible collections
+make install  # Install Python deps + Ansible collections
 ```
 
 ### 2. Configure SSH Access
@@ -81,7 +81,7 @@ ansible_ssh_common_args: >-
 Test that you can reach the VM and accept its SSH host key:
 
 ```bash
-make ping
+make ssh-check
 ```
 
 **First-time connection:** You'll be prompted to accept the VM's SSH fingerprint. Type `yes` to accept. The host key is saved to `.ssh/known_hosts` (gitignored) and all future connections verify against it for security.
@@ -162,7 +162,7 @@ make docker-destroy-all   # Type "destroy" to confirm
 make docker-bootstrap
 
 # Verify infrastructure health
-make docker-check-health
+make docker-health
 ```
 
 **What Bootstrap Does:**
@@ -188,7 +188,7 @@ make docker-deploy-all
 Then check health:
 
 ```bash
-make docker-check-health
+make docker-health
 ```
 
 ## Structure
@@ -255,22 +255,24 @@ make docker-deploy stack=my-service
 ## Common Commands
 
 ```bash
-make docker-deploy stack=traefik
-make docker-deploy stack=my-service
+# Standard operations
+make install       # Install dependencies
+make check         # Run linting
+make test          # Run full test suite
 
-# Lint & format
-make lint
-make format
+# SSH connectivity
+make ssh-check     # Test VM connectivity
+make ssh-setup     # First-time SSH setup wizard
 
-# Test connectivity
-make ping
+# Docker operations
+make docker-deploy stack=traefik       # Deploy single stack
+make docker-deploy-all                 # Deploy all stacks
+make docker-bootstrap                  # Bootstrap infrastructure
+make docker-health                     # Check infrastructure health
 
-# Install Docker on the VM
-make docker-install
-
-# Deploy a stack
-make docker-deploy stack=traefik
-make docker-deploy stack=my-service
+# Development
+make dev-format    # Auto-format YAML and shell scripts
+make dev-clean     # Remove temporary files
 
 # Run ad-hoc Ansible commands
 uv run ansible homelab -a "docker ps"
@@ -297,8 +299,8 @@ See [docs/TESTING.md](docs/TESTING.md) for Molecule workflow and [docs/TEST_STRA
 ### Linting & Formatting
 
 ```bash
-make check   # Check YAML, Ansible, shell scripts (or use 'make lint')
-make format  # Auto-format YAML and shell scripts
+make check       # Check YAML, Ansible, shell scripts
+make dev-format  # Auto-format YAML and shell scripts
 ```
 
 ### Tools Used

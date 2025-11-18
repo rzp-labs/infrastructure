@@ -32,7 +32,7 @@ Infrastructure is a **standalone project** that lives as a git submodule within 
 
 ```bash
 cd infrastructure
-make setup
+make install
 make docker-deploy stack=traefik
 ```
 
@@ -40,17 +40,13 @@ make docker-deploy stack=traefik
 
 **Prerequisites**: `uv` for Python, `yamlfmt` and `shfmt` for formatting (provided by parent DevContainer)
 
-**Pure Delegation Architecture**: Infrastructure follows workspace-wide standard Makefile targets (install, check, test) with backward-compatible aliases (setup, lint).
+**Pure Delegation Architecture**: Infrastructure follows workspace-wide standard Makefile targets with namespace organization.
 
 ```bash
 # Standard targets (Pure Delegation pattern)
 make install        # Install Python deps + Ansible collections
 make check          # Run yamllint + ansible-lint
 make test           # Validate Ansible playbooks and configuration
-
-# Backward-compatible aliases
-make setup          # Alias for install
-make lint           # Alias for check
 ```
 
 **Add dependencies**:
@@ -62,13 +58,13 @@ uv add --dev <package>     # Development dependency
 
 ### Installation
 ```bash
-make install        # Install Python deps + Ansible collections (or use 'make setup')
+make install        # Install Python deps + Ansible collections
 ```
 
 ### Code Quality
 ```bash
-make check          # Run yamllint + ansible-lint (or use 'make lint')
-make format         # Auto-format YAML and shell scripts
+make check          # Run yamllint + ansible-lint
+make dev-format     # Auto-format YAML and shell scripts
 ```
 
 ### Testing
@@ -87,9 +83,11 @@ See [tests/README.md](tests/README.md) for comprehensive testing guide.
 
 ### Deployment
 ```bash
-make ping                          # Test SSH connectivity to VM
-make docker-deploy stack=<stack-name>     # Deploy single stack
-make check-deploy                  # Validate deployment configuration
+make ssh-check                             # Test SSH connectivity to VM
+make docker-deploy stack=<stack-name>      # Deploy single stack
+make docker-deploy-all                     # Deploy all stacks
+make docker-bootstrap                      # Bootstrap infrastructure
+make docker-health                         # Check infrastructure health
 ```
 
 ### Ad-hoc Commands
@@ -299,7 +297,7 @@ cp inventory/hosts.yml.example inventory/hosts.yml
 # (See example configuration below)
 
 # 4. Accept host keys on first connection
-make ping  # Type 'yes' when prompted
+make ssh-check  # Type 'yes' when prompted
 ```
 
 **Inventory configuration example:**
@@ -333,7 +331,7 @@ SSH host keys are stored in `.ssh/known_hosts` (workspace-local, gitignored):
 
 **On first connection:**
 ```bash
-make ping
+make ssh-check
 # Prompts: "Are you sure you want to continue connecting (yes/no)?"
 # Type: yes
 # Result: Host key saved to .ssh/known_hosts
@@ -346,7 +344,7 @@ make ping
 **Regenerating known hosts:**
 ```bash
 rm .ssh/known_hosts
-make ping  # Accept host keys again
+make ssh-check  # Accept host keys again
 ```
 
 **See:** [docs/SSH_SETUP.md](docs/SSH_SETUP.md) for complete SSH configuration guide.
@@ -366,12 +364,12 @@ ssh-add -l           # Should list keys
 
 **"Host key verification failed":**
 ```bash
-# First connection: Run make ping
-make ping
+# First connection: Run make ssh-check
+make ssh-check
 
 # Host key changed legitimately:
 ssh-keygen -R 10.0.0.100
-make ping
+make ssh-check
 
 # Host key changed unexpectedly: DO NOT PROCEED (possible MITM attack)
 ```
@@ -387,7 +385,7 @@ make ping
 The same configuration works on multiple development machines (office + home):
 
 1. **On first Mac**: Complete setup, commit inventory to git
-2. **On second Mac**: Git pull, run `make ping` to accept host keys
+2. **On second Mac**: Git pull, run `make ssh-check` to accept host keys
 3. **Both Macs**: SSH connections work via 1Password agent
 
 Each workspace maintains its own `.ssh/known_hosts` file (gitignored).
@@ -438,11 +436,11 @@ ansible_user: admin
 **Working in this project**:
 1. Ensure you're in the infrastructure directory
 2. Reference parent guidance with `@../AGENTS.md` and `@../CLAUDE.md`
-3. Use local virtual environment (created by `make setup`)
+3. Use local virtual environment (created by `make install`)
 4. Follow IaC best practices: idempotency, declarative state, version control
 
 **Testing deployments**:
-1. Test connectivity: `make ping`
+1. Test connectivity: `make ssh-check`
 2. Deploy to staging/test environment first
 3. Validate with `make check-deploy`
 4. Monitor logs after deployment

@@ -22,7 +22,7 @@ The `.ssh/` directory contains **workspace-local SSH configuration** used by Ans
 10.0.0.100 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq4fN0WX...
 ```
 
-**Generation:** Automatically created on first SSH connection via `make ping`
+**Generation:** Automatically created on first SSH connection via `make ssh-check`
 
 **Security Considerations:**
 - **Gitignored** - Each workspace maintains its own known hosts
@@ -38,7 +38,7 @@ The `.ssh/` directory contains **workspace-local SSH configuration** used by Ans
 **How to regenerate:**
 ```bash
 rm .ssh/known_hosts
-make ping  # Accept new host keys
+make ssh-check  # Accept new host keys
 ```
 
 ### `.gitignore`
@@ -106,20 +106,20 @@ ansible_ssh_common_args: >-
 **Solution:**
 ```bash
 # First connection
-make ping  # Accept host key when prompted
+make ssh-check  # Accept host key when prompted
 
 # Host key changed (legitimate)
 ssh-keygen -R 10.0.0.100  # Remove old key
-make ping  # Accept new key
+make ssh-check  # Accept new key
 ```
 
 ### "No such file or directory: .ssh/known_hosts"
 
 **Cause:** First time running Ansible in this workspace
 
-**Solution:** This is normal! Run `make ping` to create the file:
+**Solution:** This is normal! Run `make ssh-check` to create the file:
 ```bash
-make ping
+make ssh-check
 # Type 'yes' when prompted to accept host key
 # File .ssh/known_hosts is created automatically
 ```
@@ -133,7 +133,7 @@ make ping
 **If host key changed legitimately** (VM reinstalled, SSH reconfigured):
 ```bash
 ssh-keygen -R 10.0.0.100
-make ping  # Accept new key
+make ssh-check  # Accept new key
 ```
 
 **If host key changed unexpectedly:**
@@ -193,7 +193,7 @@ The `post-create.sh` DevContainer script sets these automatically, but manual in
 
 ### DO
 
-✅ Run `make ping` before first deployment in a new workspace
+✅ Run `make ssh-check` before first deployment in a new workspace
 ✅ Verify host key fingerprints on first connection
 ✅ Use workspace-local known_hosts (this directory)
 ✅ Rely on SSH agent forwarding for authentication
