@@ -90,7 +90,7 @@ all:
 On first connection to each homelab host, you must accept its SSH host key fingerprint:
 
 ```bash
-make ping
+make ssh-check
 ```
 
 **Expected output on first run:**
@@ -112,7 +112,7 @@ With setup complete, Ansible commands just work:
 
 ```bash
 # Test connectivity
-make ping
+make ssh-check
 
 # Deploy a stack
 make docker-deploy stack=traefik
@@ -136,7 +136,7 @@ The same configuration works seamlessly across multiple development machines:
 **On Second Mac (Home):**
 1. Git pull to get inventory
 2. Open in DevContainer
-3. Run `make ping` to accept host keys (one-time)
+3. Run `make ssh-check` to accept host keys (one-time)
 4. SSH connections work via 1Password agent
 
 **Why this works:**
@@ -177,11 +177,11 @@ ssh admin@10.0.0.100
 **Cause:** Host key not in `.ssh/known_hosts` or host key changed
 
 **Solutions:**
-- First connection: Run `make ping` and accept host key
+- First connection: Run `make ssh-check` and accept host key
 - Host key changed legitimately: Remove old key and re-accept
   ```bash
   ssh-keygen -R 10.0.0.100
-  make ping  # Accept new key
+  make ssh-check  # Accept new key
   ```
 - If host key changed unexpectedly: **DO NOT PROCEED** - possible MITM attack
 
@@ -276,7 +276,7 @@ The `.ssh/known_hosts` file is **workspace-local and gitignored**:
 
 **Location:** `infrastructure/.ssh/known_hosts`
 
-**Backup:** Not needed - can regenerate by running `make ping`
+**Backup:** Not needed - can regenerate by running `make ssh-check`
 
 ## Advanced Configuration
 

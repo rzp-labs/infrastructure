@@ -81,10 +81,10 @@ make report
 
 ```bash
 # Run all linting checks
-make check            # or: make lint
+make check
 
 # Auto-format code
-make format
+make dev-format
 
 # Run pre-commit hooks manually
 uv run pre-commit run --all-files
@@ -94,13 +94,13 @@ uv run pre-commit run --all-files
 
 ```bash
 # Install/update dependencies
-make install          # or: make setup
+make install
 
 # Clean temporary files
-make clean
+make dev-clean
 
 # Full cleanup (including test artifacts)
-make clean-all
+make dev-clean-all
 ```
 
 ## Molecule Scenarios
