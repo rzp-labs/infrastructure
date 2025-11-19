@@ -18,3 +18,6 @@ services:
       - "traefik.http.routers.flaresolverr.rule=Host(`flaresolverr.${DOMAIN}`)"
       - "traefik.http.services.flaresolverr.loadbalancer.server.port=8191"
 
+networks:
+  traefik:
+    external: true
