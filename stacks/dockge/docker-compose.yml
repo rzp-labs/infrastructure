@@ -9,7 +9,7 @@ services:
         condition: service_started
     volumes:
       # Dockge data directory
-      - ./data:/app/data
+      - /opt/stacks/dockge/data:/app/data
       # Stacks directory
       - /opt/stacks:/opt/stacks
     environment:
@@ -30,11 +30,12 @@ services:
       - "traefik.http.routers.dockge.tls.certresolver=cloudflare"
       # Enable TLS
       - "traefik.http.routers.dockge.tls=true"
-      # Use the oauth2-proxy middleware you set up for authentication
-      - "traefik.http.routers.dockge.middlewares=traefik-auth"
+      - "traefik.http.routers.dockge.rule=Host(`dockge.${DOMAIN}`)"
       # Specify the port Dockge listens on internally (5001) for Traefik to route to
       - "traefik.http.services.dockge.loadbalancer.server.port=5001"
 
 networks:
   socket-proxy:
+    external: true
   traefik:
+    external: true

@@ -27,3 +27,9 @@ services:
       - "traefik.http.routers.dozzle.tls.certresolver=cloudflare"
       - "traefik.http.routers.dozzle.rule=Host(`dozzle.${DOMAIN}`)"
       - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+
+networks:
+  socket-proxy:
+    external: true
+  traefik:
+    external: true

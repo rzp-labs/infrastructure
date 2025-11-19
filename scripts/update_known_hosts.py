@@ -12,7 +12,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 INVENTORY_FILE = PROJECT_ROOT / "inventory" / "hosts.yml"
-KNOWN_HOSTS_FILE = Path.home() / ".ssh" / "known_hosts"
+KNOWN_HOSTS_FILE = PROJECT_ROOT / ".ssh" / "known_hosts"
 
 
 def load_inventory_hosts(inventory_path: Path) -> Dict[str, Set[str]]:
