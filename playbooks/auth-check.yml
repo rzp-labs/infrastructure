@@ -1,0 +1,35 @@
+---
+- name: Check authentication (Zitadel + OIDC) health
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Verify Zitadel OIDC discovery endpoint
+      ansible.builtin.uri:
+        url: "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}/.well-known/openid-configuration"
+        method: GET
+        validate_certs: false
+        status_code: 200
+      register: oidc_discovery
+      retries: 5
+      delay: 2
+      until: oidc_discovery is succeeded
+
+    - name: Verify Zitadel health endpoint
+      ansible.builtin.uri:
+        url: "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}/debug/healthz"
+        method: GET
+        validate_certs: false
+        status_code: 200
+      register: zitadel_health
+      retries: 5
+      delay: 2
+      until: zitadel_health is succeeded
+
+    - name: Report auth health status
+      ansible.builtin.debug:
+        msg: |
+          Authentication health check succeeded.
+          - OIDC discovery status: {{ oidc_discovery.status }}
+          - Zitadel health status: {{ zitadel_health.status }}

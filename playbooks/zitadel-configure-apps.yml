@@ -1,0 +1,102 @@
+---
+- name: Configure Zitadel projects and OIDC applications
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+    stacks_dest_dir: "/opt/stacks"
+
+  tasks:
+    - name: OAuth setup | Wait for Zitadel login client PAT
+      ansible.builtin.wait_for:
+        path: "{{ stacks_dest_dir }}/zitadel/config/login-client.pat"
+        state: present
+        timeout: 300
+        sleep: 5
+      when: not (ansible_check_mode | default(false))
+
+    - name: OAuth setup | Ensure Zitadel login client PAT is readable
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/zitadel/config/login-client.pat"
+        mode: "0644"
+
+    - name: OAuth setup | Read Zitadel login client PAT
+      ansible.builtin.slurp:
+        path: "{{ stacks_dest_dir }}/zitadel/config/login-client.pat"
+      register: zitadel_pat_slurp
+
+    - name: OAuth setup | Store Zitadel login client PAT value
+      ansible.builtin.set_fact:
+        zitadel_setup_pat: "{{ zitadel_pat_slurp.content | b64decode | trim }}"
+      no_log: true
+
+    - name: OAuth setup | Define Zitadel management API base URL
+      ansible.builtin.set_fact:
+        zitadel_setup_api_base: "{{ zitadel_setup_api_base | default('https://' ~ (lookup('env', 'ZITADEL_PUBLIC_DOMAIN') | default('login.rzp.one', true)) ~ '/management/v1') }}"
+
+    - name: OAuth setup | Initialize Zitadel setup results
+      ansible.builtin.set_fact:
+        zitadel_setup_results: []
+
+    - name: OAuth setup | Define Zitadel project name
+      ansible.builtin.set_fact:
+        zitadel_setup_project_name: >-
+          {{
+            zitadel_setup_project_name
+            | default(lookup('env', 'ZITADEL_PROJECT_NAME'), true)
+            | default('Default Project', true)
+          }}
+
+    - name: OAuth setup | Search for Zitadel project
+      ansible.builtin.uri:
+        url: "{{ zitadel_setup_api_base }}/projects/_search"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ zitadel_setup_pat }}"
+        body_format: json
+        body:
+          limit: 1
+          queries:
+            - nameQuery:
+                name: "{{ zitadel_setup_project_name }}"
+                method: "TEXT_QUERY_METHOD_EQUALS"
+        status_code: 200
+        validate_certs: true
+      register: zitadel_project_search
+      delegate_to: localhost
+      become: false
+
+    - name: OAuth setup | Determine Zitadel project ID
+      ansible.builtin.set_fact:
+        zitadel_setup_project_id: "{{ (zitadel_project_search.json.result | default([]))[0].id | default('') }}"
+
+    - name: OAuth setup | Abort when Zitadel project is not found
+      ansible.builtin.fail:
+        msg: "Zitadel project '{{ zitadel_setup_project_name }}' not found via management API. Set ZITADEL_PROJECT_NAME or create the project in Zitadel."
+      when: zitadel_setup_project_id | length == 0
+
+    - name: OAuth setup | Define Traefik OAuth2 Proxy app configuration
+      ansible.builtin.set_fact:
+        zitadel_setup_current_app:
+          name: "Traefik OAuth2 Proxy"
+          redirect_uris:
+            - "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}/oauth2/callback"
+          post_logout_redirect_uris:
+            - "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}"
+          env_file: "{{ stacks_dest_dir }}/.env"
+          env_client_id_var: "TRAEFIK_OAUTH_CLIENT_ID"
+          env_client_secret_var: "TRAEFIK_OAUTH_CLIENT_SECRET"
+
+    - name: OAuth setup | Set current Zitadel project ID
+      ansible.builtin.set_fact:
+        zitadel_setup_current_project_id: "{{ zitadel_setup_project_id }}"
+
+    - name: OAuth setup | Ensure Traefik OAuth2 Proxy OIDC app exists
+      ansible.builtin.include_tasks: tasks/zitadel_setup_manage_oidc_app.yml
+      no_log: true
+
+    - name: OAuth setup | Report Zitadel app configuration summary
+      ansible.builtin.debug:
+        var: zitadel_setup_results
+      when: zitadel_setup_results | length > 0

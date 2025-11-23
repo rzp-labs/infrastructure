@@ -19,6 +19,20 @@ http:
         stsPreload: true
         stsSeconds: 31536000
 
+    # Redirect root path to Zitadel login UI
+    zitadel-root-redirect:
+      redirectRegex:
+        regex: "^https?://[^/]+/$"
+        replacement: "/ui/v2/login"
+        permanent: true
+
+    # Ensure any legacy /ui/login path is forwarded to the v2 login UI
+    zitadel-v2-redirect:
+      redirectRegex:
+        regex: "^https?://[^/]+/ui/login$"
+        replacement: "/ui/v2/login"
+        permanent: true
+
     # Complete auth chain
     auth-chain:
       chain:

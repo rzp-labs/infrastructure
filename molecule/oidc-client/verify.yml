@@ -1,0 +1,101 @@
+---
+- name: Verify Zitadel OIDC client automation
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Verify root .env file exists
+      ansible.builtin.stat:
+        path: /opt/stacks/.env
+      register: root_env_stat
+
+    - name: Assert root .env exists
+      ansible.builtin.assert:
+        that:
+          - root_env_stat.stat.exists
+        fail_msg: "Root .env file not found at /opt/stacks/.env"
+
+    - name: Read root .env file
+      ansible.builtin.slurp:
+        path: /opt/stacks/.env
+      register: root_env_slurp
+
+    - name: Decode root .env content
+      ansible.builtin.set_fact:
+        traefik_env_content: "{{ (root_env_slurp.content | b64decode | default('')) }}"
+
+    - name: Extract OIDC-related environment lines
+      ansible.builtin.set_fact:
+        traefik_client_id_line: "{{ traefik_env_content | regex_search('^TRAEFIK_OAUTH_CLIENT_ID=.*$', multiline=True) | default('') }}"
+        traefik_client_secret_line: "{{ traefik_env_content | regex_search('^TRAEFIK_OAUTH_CLIENT_SECRET=.*$', multiline=True) | default('') }}"
+        cookie_secret_line: "{{ traefik_env_content | regex_search('^OAUTH2_PROXY_COOKIE_SECRET=.*$', multiline=True) | default('') }}"
+
+    - name: Assert OIDC client ID is present and non-empty
+      ansible.builtin.assert:
+        that:
+          - traefik_client_id_line | length > 0
+          - (traefik_client_id_line | regex_replace('^TRAEFIK_OAUTH_CLIENT_ID=', '')) | length > 0
+        fail_msg: "TRAEFIK_OAUTH_CLIENT_ID missing or empty in Traefik .env"
+
+    - name: Assert OIDC client secret is present and non-empty
+      ansible.builtin.assert:
+        that:
+          - traefik_client_secret_line | length > 0
+          - (traefik_client_secret_line | regex_replace('^TRAEFIK_OAUTH_CLIENT_SECRET=', '')) | length > 0
+        fail_msg: "TRAEFIK_OAUTH_CLIENT_SECRET missing or empty in Traefik .env"
+
+    - name: Assert OAuth2 cookie secret is present and non-empty
+      ansible.builtin.assert:
+        that:
+          - cookie_secret_line | length > 0
+          - (cookie_secret_line | regex_replace('^OAUTH2_PROXY_COOKIE_SECRET=', '')) | length > 0
+        fail_msg: "OAUTH2_PROXY_COOKIE_SECRET missing or empty in Traefik .env"
+
+    - name: Query Zitadel stub for project
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9000/management/v1/projects/_search"
+        method: POST
+        body_format: json
+        body:
+          limit: 1
+          queries:
+            - nameQuery:
+                name: "Default Project"
+                method: "TEXT_QUERY_METHOD_EQUALS"
+        status_code: 200
+        validate_certs: false
+      register: oidc_project_search
+
+    - name: Extract project ID from Zitadel stub response
+      ansible.builtin.set_fact:
+        oidc_project_id: "{{ (oidc_project_search.json.result | default([]))[0].id | default('') }}"
+
+    - name: Assert project ID was found in Zitadel stub
+      ansible.builtin.assert:
+        that:
+          - oidc_project_id | length > 0
+        fail_msg: "Zitadel stub did not return a project ID for 'Default Project'"
+
+    - name: Query Zitadel stub for Traefik OAuth2 Proxy app
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9000/management/v1/projects/{{ oidc_project_id }}/apps/_search"
+        method: POST
+        body_format: json
+        body:
+          query:
+            limit: 1
+          queries:
+            - nameQuery:
+                name: "Traefik OAuth2 Proxy"
+                method: "TEXT_QUERY_METHOD_EQUALS"
+        status_code: 200
+        validate_certs: false
+      register: oidc_app_search
+
+    - name: Assert Traefik OAuth2 Proxy app exists in Zitadel stub
+      ansible.builtin.assert:
+        that:
+          - (oidc_app_search.json.result | default([])) | length == 1
+          - (oidc_app_search.json.result[0].oidcConfig.clientId | default('')) | length > 0
+        fail_msg: "Zitadel stub did not return expected Traefik OAuth2 Proxy app with clientId"

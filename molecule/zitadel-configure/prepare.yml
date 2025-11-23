@@ -1,0 +1,225 @@
+---
+- name: Prepare for Zitadel app configuration tests
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Ensure /usr/local/bin exists
+      ansible.builtin.file:
+        path: /usr/local/bin
+        state: directory
+        mode: "0755"
+
+    - name: Install linting tools and HTTP client deps
+      ansible.builtin.pip:
+        name:
+          - yamllint
+          - ansible-lint
+          - requests
+        state: present
+        break_system_packages: true
+
+    - name: Ensure infrastructure playbook directory exists
+      ansible.builtin.file:
+        path: /opt/infrastructure/playbooks
+        state: directory
+        mode: "0755"
+
+    - name: Sync playbooks for Zitadel configure tests
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/playbooks/"
+        dest: /opt/infrastructure/playbooks/
+        owner: root
+        group: root
+        mode: "0644"
+        directory_mode: "0755"
+
+    - name: Ensure infrastructure stacks directory exists
+      ansible.builtin.file:
+        path: /opt/infrastructure/stacks
+        state: directory
+        mode: "0755"
+
+    - name: Sync stacks for Zitadel configure tests
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/stacks/"
+        dest: /opt/infrastructure/stacks/
+        owner: root
+        group: root
+        mode: "0644"
+        directory_mode: "0755"
+
+    - name: Ensure test stacks destination directory exists
+      ansible.builtin.file:
+        path: /opt/stacks
+        state: directory
+        mode: "0755"
+
+    - name: Ensure Zitadel config directory exists for tests
+      ansible.builtin.file:
+        path: /opt/stacks/zitadel/config
+        state: directory
+        mode: "0755"
+
+    - name: Create mock Zitadel login client PAT
+      ansible.builtin.copy:
+        dest: /opt/stacks/zitadel/config/login-client.pat
+        content: "mock-pat\n"
+        mode: "0644"
+
+    - name: Install Zitadel management API stub (shared with oidc-client scenario)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/zitadel_stub.py
+        mode: "0755"
+        content: |
+          #!/usr/bin/env python3
+          import json
+          import re
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+
+          STATE = {
+              "projects": {
+                  "proj-1": {
+                      "id": "proj-1",
+                      "name": "Default Project",
+                      "apps": {},
+                  }
+              }
+          }
+
+          class Handler(BaseHTTPRequestHandler):
+              def _json(self, code, obj):
+                  self.send_response(code)
+                  self.send_header("Content-Type", "application/json")
+                  self.end_headers()
+                  self.wfile.write(json.dumps(obj).encode("utf-8"))
+
+              def do_POST(self):
+                  length = int(self.headers.get("Content-Length", 0))
+                  body = self.rfile.read(length).decode("utf-8") if length else "{}"
+                  try:
+                      data = json.loads(body or "{}")
+                  except Exception:
+                      data = {}
+
+                  path = self.path
+
+                  # Project search: /management/v1/projects/_search
+                  if path.endswith("/projects/_search") and "/apps/" not in path:
+                      name_query = (
+                          data.get("queries", [{}])[0]
+                          .get("nameQuery", {})
+                          .get("name")
+                      )
+                      result = [
+                          p
+                          for p in STATE["projects"].values()
+                          if p.get("name") == name_query
+                      ]
+                      self._json(200, {"result": result})
+                      return
+
+                  # App search: /management/v1/projects/{project_id}/apps/_search
+                  m = re.match(r"^/management/v1/projects/([^/]+)/apps/_search$", path)
+                  if m:
+                      project_id = m.group(1)
+                      name_query = (
+                          data.get("queries", [{}])[0]
+                          .get("nameQuery", {})
+                          .get("name")
+                      )
+                      project = STATE["projects"].get(project_id, {"apps": {}})
+                      apps = project.get("apps", {})
+                      found = None
+                      for app in apps.values():
+                          if app.get("name") == name_query:
+                              found = app
+                              break
+                      result = []
+                      if found:
+                          result.append(
+                              {
+                                  "id": found["id"],
+                                  "name": found["name"],
+                                  "oidcConfig": {"clientId": found["clientId"]},
+                              }
+                          )
+                      self._json(200, {"result": result})
+                      return
+
+                  # Create OIDC app: /management/v1/projects/{project_id}/apps/oidc
+                  m = re.match(r"^/management/v1/projects/([^/]+)/apps/oidc$", path)
+                  if m:
+                      project_id = m.group(1)
+                      project = STATE["projects"].setdefault(
+                          project_id,
+                          {"id": project_id, "name": "Default Project", "apps": {}},
+                      )
+                      app_id = f"app-{len(project['apps']) + 1}"
+                      client_id = f"client-{len(project['apps']) + 1}"
+                      client_secret = "secret-123"
+                      app = {
+                          "id": app_id,
+                          "name": data.get("name", ""),
+                          "clientId": client_id,
+                          "clientSecret": client_secret,
+                      }
+                      project["apps"][app_id] = app
+                      self._json(
+                          200,
+                          {
+                              "appId": app_id,
+                              "clientId": client_id,
+                              "clientSecret": client_secret,
+                          },
+                      )
+                      return
+
+                  # Rotate client secret: /management/v1/projects/{project_id}/apps/{app_id}/oidc_config/_generate_client_secret
+                  m = re.match(
+                      r"^/management/v1/projects/([^/]+)/apps/([^/]+)/oidc_config/_generate_client_secret$",
+                      path,
+                  )
+                  if m:
+                      project_id, app_id = m.group(1), m.group(2)
+                      project = STATE["projects"].get(project_id, {"apps": {}})
+                      app = project.get("apps", {}).get(app_id)
+                      if not app:
+                          self._json(404, {"error": "app not found"})
+                          return
+                      app["clientSecret"] = "secret-rotated"
+                      self._json(200, {"clientSecret": app["clientSecret"]})
+                      return
+
+                  self._json(404, {"error": "not found"})
+
+              def log_message(self, *_args, **_kwargs):
+                  # Silence request logging during tests
+                  return
+
+          def main() -> None:
+              server = HTTPServer(("0.0.0.0", 9000), Handler)
+              server.serve_forever()
+
+          if __name__ == "__main__":
+              main()
+
+    - name: Start Zitadel management API stub
+      ansible.builtin.shell: |
+        nohup python3 /usr/local/bin/zitadel_stub.py >/var/log/zitadel_stub.log 2>&1 &
+        touch /var/run/zitadel_stub_started
+      args:
+        creates: /var/run/zitadel_stub_started
+      changed_when: false
+
+    - name: Set environment variables for Zitadel configure test
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        line: "{{ item }}"
+        state: present
+      loop:
+        - "DOMAIN=test.local"
+        - "ZITADEL_PUBLIC_DOMAIN=auth.test.local"
+        - "ZITADEL_PROJECT_NAME=Default Project"
+        - "TZ=UTC"

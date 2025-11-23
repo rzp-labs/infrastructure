@@ -1,0 +1,17 @@
+---
+# Stage 2 root orchestrator: user-facing services
+# Deploys Traefik and dependent applications once bootstrap is healthy
+
+networks:
+  traefik:
+    external: true
+  socket-proxy:
+    external: true
+
+include:
+  # - dockge/docker-compose.yml
+  - dozzle/docker-compose.yml
+  - flaresolverr/docker-compose.yml
+  - sonarr/docker-compose.yml
+  - stash/docker-compose.yml
+  - traefik/docker-compose.yml

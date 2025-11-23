@@ -19,6 +19,3 @@ services:
       - "traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)"
       - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
 
-networks:
-  traefik:
-    external: true

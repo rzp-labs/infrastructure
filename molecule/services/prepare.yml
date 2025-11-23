@@ -1,5 +1,5 @@
 ---
-- name: Prepare for bootstrap test
+- name: Prepare for services test
   hosts: all
   become: true
   gather_facts: true
@@ -76,7 +76,7 @@
         state: present
         break_system_packages: true
 
-    - name: Install rsync for bootstrap tests
+    - name: Install rsync for services tests
       ansible.builtin.apt:
         name: rsync
         state: present
@@ -94,7 +94,7 @@
         state: directory
         mode: "0755"
 
-    - name: Sync playbooks for bootstrap tests
+    - name: Sync playbooks for services tests
       ansible.builtin.copy:
         src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/playbooks/"
         dest: /opt/infrastructure/playbooks/
@@ -109,7 +109,7 @@
         state: directory
         mode: "0755"
 
-    - name: Sync stacks for bootstrap tests
+    - name: Sync stacks for services tests
       ansible.builtin.copy:
         src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/stacks/"
         dest: /opt/infrastructure/stacks/
@@ -118,7 +118,7 @@
         mode: "0644"
         directory_mode: "0755"
 
-    - name: Copy Makefile for bootstrap tests
+    - name: Copy Makefile for services tests
       ansible.builtin.copy:
         src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/Makefile"
         dest: /opt/infrastructure/Makefile

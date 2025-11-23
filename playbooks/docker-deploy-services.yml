@@ -1,0 +1,195 @@
+---
+- name: Deploy services stacks (Traefik + dependents)
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+    stacks_src_dir: "{{ ([playbook_dir, '..', 'stacks'] | path_join) | realpath }}"
+    stacks_dest_dir: "/opt/stacks"
+    required_networks:
+      - traefik
+      - socket-proxy
+    bootstrap_containers:
+      - docker-socket-proxy
+      - zitadel-db
+      - zitadel
+      - zitadel-login
+    services_containers:
+      - traefik
+      - traefik-oauth2-proxy
+
+  tasks:
+    - name: Ensure rsync is available on remote host
+      ansible.builtin.package:
+        name: rsync
+        state: present
+
+    - name: Ensure stacks directory exists on remote host
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Sync stacks directory (including services orchestrator) to remote host
+      ansible.posix.synchronize:
+        src: "{{ stacks_src_dir }}/"
+        dest: "{{ stacks_dest_dir }}"
+        delete: false
+        recursive: true
+        rsync_opts:
+          - "--perms"
+          - "--times"
+          - "--omit-dir-times"
+        use_ssh_args: true
+        rsync_path: "sudo rsync"
+      delegate_to: localhost
+      become: false
+
+    - name: Ensure shared networks exist for services stage
+      community.docker.docker_network:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ required_networks }}"
+
+    - name: Ensure Traefik ACME file exists with secure permissions
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/traefik/acme.json"
+        state: touch
+        owner: "0"
+        group: "0"
+        mode: "0600"
+
+    - name: OAuth setup | Ensure root environment file exists
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/.env"
+        state: touch
+        mode: "0600"
+
+    - name: OAuth setup | Read existing root environment file
+      ansible.builtin.slurp:
+        path: "{{ stacks_dest_dir }}/.env"
+      register: traefik_env_slurp
+      failed_when: false
+      when: not (ansible_check_mode | default(false))
+
+    - name: OAuth setup | Extract existing cookie secret line
+      ansible.builtin.set_fact:
+        traefik_env_content: "{{ (traefik_env_slurp.content | default('')) | b64decode | default('') }}"
+        existing_cookie_line: "{{ traefik_env_content | regex_search('^OAUTH2_PROXY_COOKIE_SECRET=.*$', multiline=True) | default('') }}"
+      when: traefik_env_slurp is defined and traefik_env_slurp.content is defined
+
+    - name: OAuth setup | Extract cookie secret value
+      ansible.builtin.set_fact:
+        current_cookie_secret: "{{ (existing_cookie_line | default('')) | regex_replace('^OAUTH2_PROXY_COOKIE_SECRET=', '') }}"
+      when: existing_cookie_line is defined
+
+    - name: OAuth setup | Generate OAuth2 cookie secret when missing
+      ansible.builtin.command: >-
+        python3 -c 'import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
+      register: cookie_secret_gen
+      changed_when: true
+      when: (current_cookie_secret | default('')) | length == 0
+
+    - name: OAuth setup | Select OAuth2 cookie secret value
+      ansible.builtin.set_fact:
+        oauth2_proxy_cookie_secret: "{{ current_cookie_secret if (current_cookie_secret | default('') | length > 0) else cookie_secret_gen.stdout }}"
+
+    - name: OAuth setup | Ensure OAuth2 cookie secret is present in root .env
+      ansible.builtin.lineinfile:
+        path: "{{ stacks_dest_dir }}/.env"
+        regexp: '^OAUTH2_PROXY_COOKIE_SECRET='
+        line: "OAUTH2_PROXY_COOKIE_SECRET={{ oauth2_proxy_cookie_secret }}"
+        create: true
+        mode: "0600"
+
+    - name: Ensure Dozzle config directory is writable by app user
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/dozzle/config"
+        state: directory
+        owner: "99"
+        group: "100"
+        mode: "0755"
+        recurse: true
+
+    - name: Ensure Sonarr config directory is writable by app user
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/sonarr"
+        state: directory
+        owner: "99"
+        group: "100"
+        mode: "0755"
+        recurse: true
+
+    - name: Ensure Stash directories are writable by app user
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "99"
+        group: "100"
+        mode: "0755"
+        recurse: true
+      loop:
+        - "{{ stacks_dest_dir }}/stash/config"
+        - "{{ stacks_dest_dir }}/stash/pip-install"
+        - "{{ stacks_dest_dir }}/stash/metadata"
+        - "{{ stacks_dest_dir }}/stash/cache"
+        - "{{ stacks_dest_dir }}/stash/generated"
+
+    - name: Ensure Stash Hub data directory is writable by app user
+      ansible.builtin.file:
+        path: "{{ stacks_dest_dir }}/stash-hub/data"
+        state: directory
+        owner: "99"
+        group: "100"
+        mode: "0755"
+        recurse: true
+
+    - name: Assert bootstrap containers are healthy before deploying services
+      ansible.builtin.command: >-
+        docker inspect -f '{% raw %}{{ .State.Running }}{% endraw %}' {{ item }}
+      register: bootstrap_status
+      changed_when: false
+      failed_when: bootstrap_status.rc != 0 or (bootstrap_status.stdout | trim) != 'true'
+      loop: "{{ bootstrap_containers }}"
+      when: not (ansible_check_mode | default(false))
+
+    - name: Deploy services compose project (root-level orchestrator)
+      community.docker.docker_compose_v2:
+        project_src: "{{ stacks_dest_dir }}"
+        project_name: services
+        files:
+          - docker-compose.services.yml
+        state: present
+        pull: always
+      when:
+        - not (docker_skip_compose | default(false))
+        - not (ansible_check_mode | default(false))
+
+    - name: Wait for key services containers to be running
+      ansible.builtin.command: >-
+        docker inspect -f '{% raw %}{{ .State.Running }}{% endraw %}' {{ item }}
+      register: service_status
+      changed_when: false
+      until: service_status.stdout | trim == 'true'
+      retries: 30
+      delay: 5
+      loop: "{{ services_containers }}"
+      when: not (ansible_check_mode | default(false))
+
+    - name: Optionally verify OIDC discovery
+      ansible.builtin.uri:
+        url: "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}/.well-known/openid-configuration"
+        method: GET
+        validate_certs: false
+        status_code: 200
+      register: oidc_ping
+      retries: 5
+      delay: 2
+      until: oidc_ping is succeeded
+      ignore_errors: true
+      when: not (ansible_check_mode | default(false))
+
+    - name: Report services deployment result
+      ansible.builtin.debug:
+        msg: "Services stacks deployed successfully"

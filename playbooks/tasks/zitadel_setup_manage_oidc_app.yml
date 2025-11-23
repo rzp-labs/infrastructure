@@ -56,6 +56,7 @@
     validate_certs: true
   register: zitadel_current_app_search
   delegate_to: localhost
+  become: false
 
 - name: Extract existing OIDC application data
   ansible.builtin.set_fact:
@@ -75,6 +76,7 @@
     validate_certs: true
   register: zitadel_current_app_create
   delegate_to: localhost
+  become: false
   when: zitadel_current_app_id | length == 0
   no_log: true
 
@@ -83,7 +85,9 @@
     zitadel_current_app_id: "{{ zitadel_current_app_create.json.appId }}"
     zitadel_current_app_client_id: "{{ zitadel_current_app_create.json.clientId }}"
     zitadel_current_app_client_secret: "{{ zitadel_current_app_create.json.clientSecret }}"
-  when: zitadel_current_app_create is defined
+  when:
+    - zitadel_current_app_create is defined
+    - zitadel_current_app_create.json is defined
 
 - name: Rotate OIDC client secret when requested
   ansible.builtin.uri:
@@ -97,6 +101,7 @@
     validate_certs: true
   register: zitadel_current_app_rotate
   delegate_to: localhost
+  become: false
   when:
     - zitadel_setup_current_app.rotate_secret | default(false)
     - zitadel_current_app_id | length > 0
@@ -105,7 +110,9 @@
 - name: Store rotated client secret
   ansible.builtin.set_fact:
     zitadel_current_app_client_secret: "{{ zitadel_current_app_rotate.json.clientSecret }}"
-  when: zitadel_current_app_rotate is defined
+  when:
+    - zitadel_current_app_rotate is defined
+    - zitadel_current_app_rotate.json is defined
 
 - name: Ensure client secret fact exists
   ansible.builtin.set_fact:

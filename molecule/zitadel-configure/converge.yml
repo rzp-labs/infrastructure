@@ -1,0 +1,51 @@
+---
+- name: Converge - Test Zitadel app configuration playbook
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Determine infrastructure project root
+      ansible.builtin.set_fact:
+        infrastructure_root: "/opt/infrastructure"
+
+    - name: Show infrastructure project root
+      ansible.builtin.debug:
+        var: infrastructure_root
+
+    - name: Create inventory for Zitadel configure test
+      ansible.builtin.copy:
+        dest: /tmp/zitadel_inventory.yml
+        content: |
+          all:
+            children:
+              homelab:
+                hosts:
+                  localhost:
+                    ansible_connection: local
+                    ansible_host: localhost
+                    ansible_python_interpreter: "{{ ansible_python.executable }}"
+        mode: "0644"
+
+    - name: Run Zitadel app configuration playbook
+      ansible.builtin.shell: |
+        cd /tmp
+        ansible-playbook -i zitadel_inventory.yml \
+          -e docker_skip_compose=true \
+          -e zitadel_setup_api_base=http://127.0.0.1:9000/management/v1 \
+          "{{ infrastructure_root }}/playbooks/zitadel-configure-apps.yml"
+      args:
+        executable: /bin/bash
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        DOMAIN: "test.local"
+        ZITADEL_PUBLIC_DOMAIN: "auth.test.local"
+        ZITADEL_PROJECT_NAME: "Default Project"
+      register: zitadel_configure
+      changed_when: false
+      failed_when: zitadel_configure.rc != 0
+
+    - name: Display Zitadel configure converge result
+      ansible.builtin.debug:
+        msg: |
+          Configure result rc={{ zitadel_configure.rc }}
