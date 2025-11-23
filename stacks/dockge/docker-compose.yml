@@ -31,8 +31,3 @@ services:
       # Specify the port Dockge listens on internally (5001) for Traefik to route to
       - "traefik.http.services.dockge.loadbalancer.server.port=5001"
 
-networks:
-  socket-proxy:
-    external: true
-  traefik:
-    external: true
