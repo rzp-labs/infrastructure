@@ -4,9 +4,6 @@ services:
     container_name: dozzle
     restart: unless-stopped
     user: "99:100"
-    depends_on:
-      docker-socket-proxy:
-        condition: service_started
     networks:
       - traefik
       - socket-proxy
@@ -27,3 +24,4 @@ services:
       - "traefik.http.routers.dozzle.tls.certresolver=cloudflare"
       - "traefik.http.routers.dozzle.rule=Host(`dozzle.${DOMAIN}`)"
       - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+

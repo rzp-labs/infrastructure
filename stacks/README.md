@@ -24,11 +24,9 @@ stacks/
 │   ├── traefik.yml                 # Traefik static configuration
 │   ├── config/                     # Dynamic configuration snippets (synced)
 │   ├── acme.json                   # ACME certificate storage (created remotely)
-│   ├── .env.example                # Environment template (Cloudflare, domain, OAuth)
 │   └── .env                        # Actual secrets (gitignored)
 └── zitadel/
     ├── docker-compose.yml          # Zitadel identity provider stack
-    ├── .env.example                # Bootstrap + domain configuration template
     ├── .env                        # Actual secrets (gitignored)
     └── config/                     # Shared runtime artifacts (e.g., PAT files)
 ```

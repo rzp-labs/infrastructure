@@ -1,0 +1,13 @@
+---
+# Stage 1 root orchestrator: foundational services
+# Deploys security primitives + identity provider needed before user-facing stacks
+
+networks:
+  traefik:
+    external: true
+  socket-proxy:
+    external: true
+
+include:
+  - docker-socket-proxy/docker-compose.yml
+  - zitadel/docker-compose.yml

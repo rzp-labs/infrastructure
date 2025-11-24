@@ -9,18 +9,13 @@
     stacks_dir: /opt/stacks
     root_project_name: stacks
     stack_state: present
-    backup_dir: /opt/stack_backups
-    compose_backup_suffix: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
 
   tasks:
     - name: Ensure base directories exist
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: "{{ stacks_dir }}"
         state: directory
         mode: "0755"
-      loop:
-        - "{{ stacks_dir }}"
-        - "{{ backup_dir }}"
 
     - name: Ensure rsync is available on remote host
       ansible.builtin.package:
@@ -37,7 +32,7 @@
           - "--perms"
           - "--times"
           - "--omit-dir-times"
-        ssh_args: "{{ ((ansible_ssh_common_args | default('')) ~ ' -o IdentitiesOnly=yes') | trim }}"
+        use_ssh_args: true
         rsync_path: "sudo rsync"
       delegate_to: localhost
       become: false
@@ -48,16 +43,13 @@
         state: touch
         mode: '0600'
 
-    - name: Back up current Compose files before deploy
-      community.general.archive:
-        path: "{{ stacks_dir }}"
-        dest: "{{ backup_dir }}/compose_backup_{{ compose_backup_suffix }}.tar.gz"
-        format: gz
-        mode: "0644"
-      register: backup_result
-      changed_when: backup_result.dest is defined
-      failed_when: backup_result.failed is defined and backup_result.failed
-      when: stack_state == 'present'
+    - name: Create shared Docker networks
+      community.docker.docker_network:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - traefik
+        - socket-proxy
 
     - name: Deploy all stacks via root orchestrator
       community.docker.docker_compose_v2:
@@ -65,6 +57,4 @@
         project_name: "{{ root_project_name }}"
         state: "{{ stack_state }}"
         pull: "{{ 'always' if stack_state == 'present' else 'missing' }}"
-        networks:
-          socket-proxy:
-            external: true
+        # Network definitions managed in docker-compose.yml

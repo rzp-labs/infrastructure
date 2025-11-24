@@ -1,5 +1,5 @@
 ---
-- name: Verify bootstrap deployment
+- name: Verify services deployment
   hosts: all
   become: true
   gather_facts: true
@@ -28,10 +28,9 @@
         path: "{{ item }}"
       register: playbook_check
       loop:
-        - /opt/infrastructure/playbooks/docker-bootstrap.yml
-        - /opt/infrastructure/playbooks/docker-check-health.yml
         - /opt/infrastructure/playbooks/docker-deploy-bootstrap.yml
         - /opt/infrastructure/playbooks/docker-deploy-services.yml
+        - /opt/infrastructure/playbooks/docker-check-health.yml
 
     - name: Display playbook check results
       ansible.builtin.debug:
@@ -45,8 +44,8 @@
         fail_msg: "Required playbook not found: {{ item.item }}"
       loop: "{{ playbook_check.results }}"
 
-    - name: Verify Makefile has new targets
-      ansible.builtin.shell: grep -E "docker-bootstrap|docker-check-health|docker-deploy-bootstrap|docker-deploy-services" /opt/infrastructure/Makefile
+    - name: Verify Makefile has staged deploy targets
+      ansible.builtin.shell: grep -E "docker-deploy-bootstrap|docker-deploy-services" /opt/infrastructure/Makefile
       register: makefile_check
       changed_when: false
 
@@ -62,21 +61,26 @@
           - "{extends: default, rules: {line-length: {max: 200}}}"
           - "{{ item }}"
       loop:
-        - /opt/infrastructure/playbooks/docker-bootstrap.yml
+        - /opt/infrastructure/playbooks/docker-deploy-bootstrap.yml
+        - /opt/infrastructure/playbooks/docker-deploy-services.yml
         - /opt/infrastructure/playbooks/docker-check-health.yml
       register: yaml_check
       changed_when: false
 
     - name: Display YAML syntax check
       ansible.builtin.debug:
-        msg: "YAML syntax valid"
+        msg: "YAML syntax valid for staged deploy playbooks"
 
     - name: Verify Ansible lint compliance
-      ansible.builtin.shell: ansible-lint /opt/infrastructure/playbooks/docker-bootstrap.yml /opt/infrastructure/playbooks/docker-check-health.yml
+      ansible.builtin.shell: >-
+        ansible-lint
+        /opt/infrastructure/playbooks/docker-deploy-bootstrap.yml
+        /opt/infrastructure/playbooks/docker-deploy-services.yml
+        /opt/infrastructure/playbooks/docker-check-health.yml
       register: lint_check
       changed_when: false
       ignore_errors: true
 
     - name: Display Ansible lint results
       ansible.builtin.debug:
-        msg: "Linting completed (check output for any issues)"
+        msg: "Linting completed for staged deploy playbooks (check output for any issues)"

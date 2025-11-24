@@ -19,8 +19,11 @@ sync-molecule-deps: requirements.yml ## Sync root requirements into Molecule sce
 	fi
 
 STACK_DIRS := $(shell find stacks -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
-DEPLOY_STACK_TARGETS := $(addprefix deploy-,$(STACK_DIRS))
-DOCKER_DEPLOY_STACK_TARGETS := $(addprefix docker-deploy-,$(STACK_DIRS))
+# Exclude staged orchestrator pseudo-stacks from generic per-stack deploy targets.
+# These are managed via dedicated staged playbooks and targets instead.
+STACK_DIRS_NO_STAGED := $(filter-out bootstrap services,$(STACK_DIRS))
+DEPLOY_STACK_TARGETS := $(addprefix deploy-,$(STACK_DIRS_NO_STAGED))
+DOCKER_DEPLOY_STACK_TARGETS := $(addprefix docker-deploy-,$(STACK_DIRS_NO_STAGED))
 
 .PHONY: help install check test setup lint format ping deploy docker-deploy\
  				 check-deploy clean destroy-zitadel docker-install docker-destroy-all\
@@ -63,6 +66,7 @@ help: ## Show this help message
 	@echo "  make docker-deploy-all   Deploy all stacks via root orchestrator"
 	@echo "  make docker-bootstrap    Bootstrap infrastructure with OAuth setup"
 	@echo "  make docker-check-health Check infrastructure health and report status"
+	@echo "  make docker-check-auth Check Zitadel + OIDC auth health (hard fail on issues)"
 	@echo "  make docker-install      Provision Docker engine and compose on homelab host"
 	@echo "  make docker-start-all    Bring up all stacks via root orchestrator"
 	@echo "  make docker-stop-all     Stop all stacks without removing data"
@@ -188,6 +192,16 @@ docker-deploy-all: ## Deploy all stacks using root orchestrator
 	uv run python scripts/update_known_hosts.py
 	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-all.yml
 
+docker-deploy-bootstrap: ## Deploy bootstrap stage (socket proxy + Zitadel)
+	@echo "Deploying bootstrap stage..."
+	uv run python scripts/update_known_hosts.py
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-bootstrap.yml
+
+docker-deploy-services: ## Deploy services stage (Traefik + dependents)
+	@echo "Deploying services stage..."
+	uv run python scripts/update_known_hosts.py
+	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-services.yml
+
 docker-bootstrap: ## Bootstrap infrastructure with orchestrated deployment and OAuth setup
 	@echo "Bootstrapping infrastructure..."
 	uv run python scripts/update_known_hosts.py
@@ -197,6 +211,18 @@ docker-check-health: ## Check infrastructure health and report status
 	@echo "Checking infrastructure health..."
 	uv run python scripts/update_known_hosts.py
 	scripts/ansible_exec.sh ansible-playbook playbooks/docker-check-health.yml
+
+docker-check-auth: ## Check Zitadel + OIDC authentication health
+	@echo "Checking authentication (Zitadel + OIDC) health..."
+	uv run python scripts/update_known_hosts.py
+	scripts/ansible_exec.sh ansible-playbook playbooks/auth-check.yml
+
+auth-check: ## [deprecated] Alias for docker-check-auth
+	@$(MAKE) docker-check-auth
+
+zitadel-configure:
+	uv run python scripts/update_known_hosts.py
+	scripts/ansible_exec.sh ansible-playbook playbooks/zitadel-configure-apps.yml
 
 deploy-all: ## [deprecated] Use docker-deploy-all instead
 	@$(MAKE) docker-deploy-all
@@ -272,8 +298,11 @@ bootstrap: ## Bootstrap testing environment (installs Docker if needed)
 	@bash scripts/bootstrap.sh
 
 test-molecule: sync-molecule-deps ## Run Molecule tests with idempotence checks
-	@echo "Running Molecule tests..."
-	@bash scripts/run_molecule.sh default test
+	@echo "Running Molecule tests for all scenarios..."
+	@for scenario in $(MOLECULE_SCENARIOS); do \
+			echo "==> Running scenario: $$scenario"; \
+			bash scripts/run_molecule.sh $$scenario test || exit $$?; \
+		done
 
 test-quality: ## Run IaC quality analysis
 	@echo "Running quality analysis..."

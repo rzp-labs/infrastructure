@@ -4,11 +4,6 @@ services:
     image: traefik:v3.2
     container_name: traefik
     restart: unless-stopped
-    depends_on:
-      docker-socket-proxy:
-        condition: service_started
-      traefik-oauth2-proxy:
-        condition: service_started
     security_opt:
       - no-new-privileges:true
     command:
@@ -76,3 +71,4 @@ services:
       - "traefik.http.routers.traefik-oauth2-proxy.tls.certresolver=cloudflare"
       - "traefik.http.routers.traefik-oauth2-proxy.rule=Host(`login.${DOMAIN}`) && PathPrefix(`/oauth2`)"
       - "traefik.http.services.traefik-oauth2-proxy.loadbalancer.server.port=4180"
+

@@ -14,7 +14,8 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.sonarr.entrypoints=websecure"
-      - "traefik.http.routers.sonarr.middlewares=sso-forward-auth@file"
+      # - "traefik.http.routers.sonarr.middlewares=sso-forward-auth@file"  # Middleware not defined, uncomment when configured
       - "traefik.http.routers.sonarr.tls.certresolver=cloudflare"
       - "traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)"
       - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+
