@@ -1,0 +1,127 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+  "name": "amplifier",
+  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/jungaretti/features/make:1": {},
+    "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
+    // "ghcr.io/devcontainers-extra/features/pipx-package:1": {
+    //   "package": "uv",
+    //   "version": "latest"
+    // },
+    "ghcr.io/devcontainers/features/node:1": {
+      "nodeGypDependencies": true,
+      "installYarnUsingApt": true,
+      "version": "lts",
+      "nvmVersion": "latest",
+      "pnpmVersion": "latest"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "installMaven": false,
+      "installGradle": false
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "ghcr.io/devcontainers/features/sshd:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/christophermacgown/devcontainer-features/direnv:1": {},
+    "ghcr.io/hspaans/devcontainer-features/ansible-lint:2": {},
+    "ghcr.io/devcontainers-extra/features/yamllint:2": {},
+    "ghcr.io/lentzi90/features/yamlfmt:0": {}
+  },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [3000, 8000],
+  // Use 'portsAttributes' to configure the behavior of specific port forwarding instances.
+  // "portsAttributes": {
+  //   "3000": {
+  //     "label": "app"
+  //   },
+  //   "8000": {
+  //     "label": "service"
+  //   }
+  // },
+  // Use 'otherPortsAttributes' to set the defaults that are applied to all ports, unless overridden
+  // with port-specific entries in 'portsAttributes'.
+  // "otherPortsAttributes": {},
+  // "updateContentCommand": "make -C ${containerWorkspaceFolder} install",
+  "onCreateCommand": "git submodule update --init --recursive",
+  "postCreateCommand": "./.devcontainer/post-create.sh",
+  "postStartCommand": "git config --global submodule.recurse true",
+  "updateContentCommand": "git submodule update --init --recursive",
+  "runArgs": ["--name=amplifier_devcontainer"],
+  // Configure tool-specific properties.
+  "customizations": {
+    "codespaces": {
+      "openFiles": [".devcontainer/POST_SETUP_README.md"]
+    },
+    "vscode": {
+      "extensions": [
+        // AI & Code Intelligence
+        "anthropic.claude-code",
+        "GitHub.copilot",
+        "github.codespaces",
+
+        // Python
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+
+        // Ansible & IaC
+        "redhat.ansible",
+        "redhat.vscode-yaml",
+
+        // Shell
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+
+        // Code Quality
+        "EditorConfig.EditorConfig",
+        "sonarsource.sonarlint-vscode",
+        "usernamehw.errorlens",
+
+        // Git & GitHub
+        "eamodio.gitlens",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+
+        // Formatting & Language Support
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "tamasfe.even-better-toml",
+        "mikestead.dotenv",
+
+        // Documentation
+        "aaron-bond.better-comments",
+        "bierner.markdown-mermaid",
+        "bierner.markdown-preview-github-styles",
+        "streetsidesoftware.code-spell-checker",
+
+        // Utilities
+        "ms-vscode.makefile-tools",
+        "mechatroner.rainbow-csv"
+      ],
+      "settings": {
+        "sonarlint.ls.javaHome": "/usr/local/sdkman/candidates/java/current"
+      }
+    }
+  },
+  "containerEnv": {
+    // The default `uv` cache dir is at /home/vscode/.cache/uv, which is on a different disk than the default
+    // for workspaces.
+    // Ensure the cache is on the same disk for optimal uv performance. https://docs.astral.sh/uv/concepts/cache/#cache-directory
+    // ${containerWorkspaceFolder} == /workspaces/repo-name
+    "UV_CACHE_DIR": "${containerWorkspaceFolder}/../.cache/uv"
+  }
+  // Connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root"
+}
