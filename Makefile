@@ -215,7 +215,7 @@ ssh-setup: ## Run first-time SSH setup wizard
 
 .PHONY: ssh-test
 ssh-test: ## Run SSH diagnostics
-	@$(UV_RUN) ansible-playbook playbooks/ssh-diagnose.yml
+	@uv run ansible-playbook playbooks/ssh-diagnose.yml
 
 ssh-prime: ## Refresh repo-managed SSH host fingerprints from inventory
 	uv run python scripts/update_known_hosts.py
