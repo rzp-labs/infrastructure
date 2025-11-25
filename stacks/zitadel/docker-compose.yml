@@ -66,6 +66,9 @@ services:
       - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED=true
       - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD=${ZITADEL_ADMIN_PASSWORD}
       - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED=false
+      # Feature flags - enable v2 APIs for console
+      - ZITADEL_DEFAULTINSTANCE_FEATURES_CONSOLEUSEV2USERAPI=true
+      - ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED=true
     volumes:
       - ./config:/zitadel
     networks:
@@ -118,3 +121,5 @@ volumes:
 networks:
   zitadel:
     internal: true
+  traefik:
+    external: true

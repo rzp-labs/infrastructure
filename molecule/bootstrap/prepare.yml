@@ -142,3 +142,203 @@
         - "CLOUDFLARE_DNS_API_TOKEN=test-token"
         - "ACME_EMAIL=test@test.local"
         - "TZ=UTC"
+
+    # Setup for zitadel-reset testing
+    - name: Create mock stacks .env file for reset testing
+      ansible.builtin.copy:
+        dest: /tmp/stacks/.env
+        mode: "0600"
+        content: |
+          DOMAIN=test.local
+          TZ=UTC
+          ZITADEL_COMMAND=start
+          ZITADEL_FIRSTINSTANCE_SKIP=true
+          ZITADEL_PUBLIC_DOMAIN=auth.test.local
+          ZITADEL_MASTERKEY=testmasterkey123456789012345678
+          ZITADEL_TLS_MODE=external
+          ZITADEL_SERVER_PORT=8080
+          ZITADEL_DB_NAME=zitadel
+          ZITADEL_DB_SSL_MODE=disable
+          ZITADEL_DB_ADMIN_USER=postgres
+          ZITADEL_DB_ADMIN_PASSWORD=testpassword
+          ZITADEL_DB_USER=postgres
+          ZITADEL_DB_PASSWORD=testpassword
+
+    - name: Create mock zitadel config directory
+      ansible.builtin.file:
+        path: /tmp/stacks/zitadel/config
+        state: directory
+        mode: "0755"
+
+    - name: Create mock login-client.pat file
+      ansible.builtin.copy:
+        dest: /tmp/stacks/zitadel/config/login-client.pat
+        content: "mock-pat-token-for-testing"
+        mode: "0644"
+
+    - name: Create state directory for docker stub
+      ansible.builtin.file:
+        path: /tmp/docker-stub-state
+        state: directory
+        mode: "0755"
+
+    - name: Initialize container state file
+      ansible.builtin.copy:
+        dest: /tmp/docker-stub-state/containers
+        content: |
+          docker-socket-proxy
+          zitadel
+          zitadel-login
+          zitadel-db
+        mode: "0644"
+
+    - name: Initialize volume state file
+      ansible.builtin.copy:
+        dest: /tmp/docker-stub-state/volumes
+        content: |
+          stacks_zitadel-db-data
+        mode: "0644"
+
+    - name: Update stub docker CLI to support reset testing with state tracking
+      ansible.builtin.copy:
+        dest: /usr/local/bin/docker
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          STATE_DIR="/tmp/docker-stub-state"
+          CONTAINERS_FILE="$STATE_DIR/containers"
+          VOLUMES_FILE="$STATE_DIR/volumes"
+
+          subcommand="$1"
+          shift || true
+
+          # Normalize calls like: docker --host unix:///var/run/docker.sock version
+          if [ "$subcommand" = "--host" ]; then
+            shift || true  # skip host value
+            subcommand="$1"
+            shift || true
+          fi
+
+          # Helper function to JSON-escape a string
+          json_escape() {
+            printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+          }
+
+          case "$subcommand" in
+            ps)
+              # Check for -a flag and format flag
+              if echo "$@" | grep -q -- "--format"; then
+                # Return container names from state file (raw names)
+                if [ -f "$CONTAINERS_FILE" ]; then
+                  cat "$CONTAINERS_FILE"
+                fi
+                exit 0
+              elif echo "$@" | grep -q -- "-a"; then
+                # Return JSON format with proper escaping
+                containers=""
+                if [ -f "$CONTAINERS_FILE" ]; then
+                  while IFS= read -r name; do
+                    if [ -n "$name" ]; then
+                      escaped_name=$(json_escape "$name")
+                      containers="$containers{\"Names\":\"$escaped_name\",\"State\":\"running\"},"
+                    fi
+                  done < "$CONTAINERS_FILE"
+                fi
+                containers="${containers%,}"  # Remove trailing comma
+                echo "[$containers]"
+              else
+                echo '[{"Names":"docker-socket-proxy","State":"running"}]'
+              fi
+              ;;
+            stop)
+              echo "Stopping container: $@"
+              exit 0
+              ;;
+            rm)
+              # Parse arguments properly to handle flags and container names
+              force_flag=false
+              container_names=()
+              for arg in "$@"; do
+                case "$arg" in
+                  -f|--force)
+                    force_flag=true
+                    ;;
+                  -*)
+                    # Skip other flags
+                    ;;
+                  *)
+                    container_names+=("$arg")
+                    ;;
+                esac
+              done
+              # Remove each container from state file using exact line matching
+              for container_name in "${container_names[@]}"; do
+                if [ -f "$CONTAINERS_FILE" ] && [ -n "$container_name" ]; then
+                  grep -vFx "$container_name" "$CONTAINERS_FILE" > "$CONTAINERS_FILE.tmp" 2>/dev/null || true
+                  mv "$CONTAINERS_FILE.tmp" "$CONTAINERS_FILE" 2>/dev/null || true
+                fi
+                echo "Removing container: $container_name"
+              done
+              exit 0
+              ;;
+            inspect)
+              echo "true"
+              ;;
+            exec)
+              # Simulate pg_isready for database check
+              if echo "$@" | grep -q "pg_isready"; then
+                echo "/var/run/postgresql:5432 - accepting connections"
+                exit 0
+              fi
+              exit 0
+              ;;
+            network)
+              if [ "$1" = "ls" ]; then
+                cat <<'JSON'
+          [{"Name":"stacks_socket-proxy"},{"Name":"stacks_traefik"},{"Name":"stacks_zitadel"},{"Name":"traefik"}]
+          JSON
+              else
+                echo "Network operation: $@"
+              fi
+              ;;
+            volume)
+              if [ "$1" = "ls" ]; then
+                shift
+                # Return volumes from state file
+                if [ -f "$VOLUMES_FILE" ]; then
+                  cat "$VOLUMES_FILE"
+                fi
+              elif [ "$1" = "rm" ]; then
+                volume_name="$2"
+                # Remove volume from state file using exact line matching
+                if [ -f "$VOLUMES_FILE" ] && [ -n "$volume_name" ]; then
+                  grep -vFx "$volume_name" "$VOLUMES_FILE" > "$VOLUMES_FILE.tmp" 2>/dev/null || true
+                  mv "$VOLUMES_FILE.tmp" "$VOLUMES_FILE" 2>/dev/null || true
+                fi
+                echo "Removed volume: $volume_name"
+              fi
+              ;;
+            version|info)
+              echo '{"Server":{"Version":"24.0.7"},"Client":{"Version":"24.0.7"}}'
+              ;;
+            compose)
+              if [ "$1" = "version" ]; then
+                echo "Docker Compose version v2.27.0"
+              elif echo "$@" | grep -q "down"; then
+                # Remove zitadel containers from state on compose down using exact line matching
+                if [ -f "$CONTAINERS_FILE" ]; then
+                  for name in zitadel zitadel-login zitadel-db; do
+                    grep -vFx "$name" "$CONTAINERS_FILE" > "$CONTAINERS_FILE.tmp" 2>/dev/null || true
+                    mv "$CONTAINERS_FILE.tmp" "$CONTAINERS_FILE" 2>/dev/null || true
+                  done
+                fi
+                echo "Stopping services..."
+              fi
+              ;;
+            logs)
+              exit 0
+              ;;
+            *)
+              exit 0
+              ;;
+          esac

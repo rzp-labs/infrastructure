@@ -32,6 +32,7 @@
         - /opt/infrastructure/playbooks/docker-check-health.yml
         - /opt/infrastructure/playbooks/docker-deploy-bootstrap.yml
         - /opt/infrastructure/playbooks/docker-deploy-services.yml
+        - /opt/infrastructure/playbooks/zitadel-reset.yml
 
     - name: Display playbook check results
       ansible.builtin.debug:
@@ -46,7 +47,7 @@
       loop: "{{ playbook_check.results }}"
 
     - name: Verify Makefile has new targets
-      ansible.builtin.shell: grep -E "docker-bootstrap|docker-check-health|docker-deploy-bootstrap|docker-deploy-services" /opt/infrastructure/Makefile
+      ansible.builtin.shell: grep -E "docker-bootstrap|docker-check-health|docker-deploy-bootstrap|docker-deploy-services|zitadel-reset" /opt/infrastructure/Makefile
       register: makefile_check
       changed_when: false
 

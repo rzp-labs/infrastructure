@@ -1,0 +1,110 @@
+---
+- name: Reset Zitadel instance for clean reinitialization
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    stacks_dir: /opt/stacks
+    zitadel_compose_file: "{{ stacks_dir }}/zitadel/docker-compose.yml"
+    zitadel_config_dir: "{{ stacks_dir }}/zitadel/config"
+
+  tasks:
+    - name: Confirm reset operation
+      ansible.builtin.pause:
+        prompt: |
+          WARNING: This will DELETE all Zitadel data including:
+            - All users and organizations
+            - All OAuth applications and credentials
+            - All sessions and tokens
+
+          The bootstrap playbook will need to be run afterwards to recreate
+          the OAuth applications.
+
+          Press ENTER to continue or Ctrl+C to abort
+      when: not (skip_confirmation | default(false) | bool)
+
+    - name: Stop Zitadel containers via docker compose
+      ansible.builtin.shell: |
+        cd "{{ stacks_dir }}"
+        # Try with explicit project name first (matches bootstrap)
+        docker compose --project-name stacks -f zitadel/docker-compose.yml down --remove-orphans 2>/dev/null || true
+        # Also try without project name in case it was started differently
+        docker compose -f zitadel/docker-compose.yml down --remove-orphans 2>/dev/null || true
+      changed_when: true
+
+    - name: Force stop and remove Zitadel containers
+      ansible.builtin.shell: |
+        # Stop containers gracefully first
+        for container in zitadel zitadel-login zitadel-db; do
+          docker stop "$container" 2>/dev/null || true
+        done
+        # Force remove if still present
+        for container in zitadel zitadel-login zitadel-db; do
+          docker rm -f "$container" 2>/dev/null || true
+        done
+      changed_when: true
+
+    - name: Wait for containers to be fully removed
+      ansible.builtin.shell: |
+        docker ps -a --format '{{ '{{' }}.Names{{ '}}' }}' | grep -E '^(zitadel|zitadel-login|zitadel-db)$'
+      register: container_check
+      until: container_check.rc != 0
+      retries: 30
+      delay: 2
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if containers still exist
+      ansible.builtin.fail:
+        msg: "Zitadel containers still exist after removal attempts: {{ container_check.stdout }}"
+      when: container_check.rc == 0
+
+    - name: Get all Zitadel database volumes
+      ansible.builtin.shell: |
+        docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' | grep -E 'zitadel.*db.*data|zitadel-db-data' || true
+      register: zitadel_volumes
+      changed_when: false
+
+    - name: Remove Zitadel database volumes
+      ansible.builtin.shell: |
+        docker volume rm "{{ item }}"
+      loop: "{{ zitadel_volumes.stdout_lines | default([]) }}"
+      when: zitadel_volumes.stdout_lines | default([]) | length > 0
+      register: volume_removal
+
+    - name: Verify volumes are deleted
+      ansible.builtin.shell: |
+        docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' | grep -E 'zitadel.*db.*data|zitadel-db-data'
+      register: volume_check
+      failed_when: volume_check.rc == 0
+      changed_when: false
+
+    - name: Remove Zitadel PAT file
+      ansible.builtin.file:
+        path: "{{ zitadel_config_dir }}/login-client.pat"
+        state: absent
+
+    - name: Set Zitadel command to start-from-init
+      ansible.builtin.lineinfile:
+        path: "{{ stacks_dir }}/.env"
+        regexp: '^ZITADEL_COMMAND='
+        line: 'ZITADEL_COMMAND=start-from-init'
+        create: true
+        mode: '0600'
+
+    - name: Set ZITADEL_FIRSTINSTANCE_SKIP to false
+      ansible.builtin.lineinfile:
+        path: "{{ stacks_dir }}/.env"
+        regexp: '^ZITADEL_FIRSTINSTANCE_SKIP='
+        line: 'ZITADEL_FIRSTINSTANCE_SKIP=false'
+        create: true
+        mode: '0600'
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg: |
+          Zitadel has been reset. Next steps:
+            1. Run: make docker-bootstrap
+            2. This will reinitialize Zitadel with the new feature flags
+            3. OAuth applications will be recreated automatically

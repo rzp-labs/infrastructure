@@ -55,6 +55,8 @@ verifier:
 
 scenario:
   name: bootstrap
+  # Note: idempotence is skipped because the reset playbook is destructive by design
+  # and the converge includes reset testing which modifies state
   test_sequence:
     - dependency
     - cleanup
@@ -63,7 +65,6 @@ scenario:
     - create
     - prepare
     - converge
-    - idempotence
     - verify
     - cleanup
     - destroy

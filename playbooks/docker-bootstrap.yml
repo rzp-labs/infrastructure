@@ -40,7 +40,11 @@
           - "--perms"
           - "--times"
           - "--omit-dir-times"
-        ssh_args: "{{ ((ansible_ssh_common_args | default('')) ~ ' -o IdentitiesOnly=yes') | trim }}"
+        ssh_args: >-
+          -o StrictHostKeyChecking=no
+          -o UserKnownHostsFile=/dev/null
+          -o IdentitiesOnly=yes
+          -o IdentityFile=~/.ssh/1Password/SHA256_Wsf4M9CypJTAGYY_q23s9tkxe_lLmpck3njfynuMtXo.pub
         rsync_path: "sudo rsync"
       delegate_to: localhost
       become: false
@@ -60,28 +64,43 @@
         state: present
         pull: always
 
+    - name: Foundation stage | Ensure traefik network exists
+      community.docker.docker_network:
+        name: traefik
+        state: present
+
     - name: Foundation stage | Deploy zitadel-db
       community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dir }}/zitadel"
+        project_src: "{{ stacks_dir }}"
+        project_name: "{{ root_project_name }}"
+        files:
+          - zitadel/docker-compose.yml
         state: present
         pull: always
         services:
           - zitadel-db
 
     - name: Foundation stage | Wait for Zitadel database to be ready
-      ansible.builtin.wait_for:
-        host: localhost
-        port: 5432
-        delay: 5
-        timeout: 60
-        state: started
-      environment:
-        PGHOST: localhost
-        PGPORT: "5432"
+      ansible.builtin.shell: |
+        for i in $(seq 1 30); do
+          if docker exec zitadel-db pg_isready -U postgres 2>/dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        exit 1
+      register: db_ready
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: db_ready.rc == 0
 
     - name: Foundation stage | Deploy Zitadel (bootstrap detection)
       community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dir }}/zitadel"
+        project_src: "{{ stacks_dir }}"
+        project_name: "{{ root_project_name }}"
+        files:
+          - zitadel/docker-compose.yml
         state: present
         pull: always
         services:
@@ -111,14 +130,15 @@
       delay: 5
       until: result is succeeded
       vars:
-        result: "{{ lookup('url', 'https://' + (lookup('env', 'ZITADEL_PUBLIC_DOMAIN') | default('auth.rzp.one')) + '/healthz', validate_certs=False) | default('') }}"
+        zitadel_domain: "{{ lookup('env', 'ZITADEL_PUBLIC_DOMAIN') | default('auth.rzp.one') }}"
+        result: "{{ lookup('url', 'https://' + zitadel_domain + '/healthz', validate_certs=False) | default('') }}"
       register: zitadel_health
       ignore_errors: true
       timeout: 300
 
     - name: Foundation stage | Set Zitadel to steady-state command
       ansible.builtin.lineinfile:
-        path: "{{ stacks_dir }}/zitadel/.env"
+        path: "{{ stacks_dir }}/.env"
         regexp: '^ZITADEL_COMMAND='
         line: 'ZITADEL_COMMAND=start'
         mode: '0600'
@@ -137,6 +157,11 @@
       ansible.builtin.set_fact:
         zitadel_login_pat: "{{ zitadel_pat_slurp.content | b64decode | trim }}"
       no_log: true
+
+    # Note: Console V2 API feature flag is set via environment variable in docker-compose.yml
+    # (ZITADEL_DEFAULTINSTANCE_FEATURES_CONSOLEUSEV2USERAPI=true)
+    # This applies to new instances. For existing instances, enable via console UI at:
+    # https://login.rzp.one/ui/console/instance?id=features
 
     - name: OAuth setup | Create Traefik OAuth application
       ansible.builtin.include_role:

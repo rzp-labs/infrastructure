@@ -130,7 +130,10 @@
     - name: Build health report
       ansible.builtin.set_fact:
         health_report:
-          timestamp: "{{ (ansible_date_time.iso8601 if (ansible_date_time is defined and ansible_date_time.iso8601 is defined) else lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
+          timestamp: >-
+            {{ (ansible_date_time.iso8601
+                if (ansible_date_time is defined and ansible_date_time.iso8601 is defined)
+                else lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}
           containers:
             total: "{{ container_analysis.total }}"
             running: "{{ container_analysis.running_count }}"
