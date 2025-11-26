@@ -4,11 +4,11 @@ services:
     container_name: profilarr
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 6868:6868
     volumes:
-      - /mnt/user/appdata/Profilarr:/config
+      - /opt/stacks/profilarr:/config
     environment:
       - GIT_USER_NAME=${GIT_USER_NAME}
       - GIT_USER_EMAIL=${GIT_USER_EMAIL}
@@ -19,5 +19,5 @@ services:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/Dictionarry-Hub/logo/refs/heads/main/profilarr/profilarr.png
 
 networks:
-  rzp-net:
+  traefik:
     external: true

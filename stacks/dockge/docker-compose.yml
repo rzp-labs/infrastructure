@@ -23,7 +23,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dockge.entrypoints=websecure"
-      - "traefik.http.routers.dockge.middlewares=chain-sso-internal@file"
+      - "traefik.http.routers.dockge.middlewares=internal@file,secure-headers@file"
       - "traefik.http.routers.dockge.tls.certresolver=cloudflare"
       # Enable TLS
       - "traefik.http.routers.dockge.tls=true"

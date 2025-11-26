@@ -4,14 +4,14 @@ services:
     container_name: fileflows
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 8585:5000
     volumes:
-      - /mnt/user/appdata/fileflows/data:/app/Data
-      - /mnt/user/appdata/fileflows/logs:/app/Logs
-      - /mnt/user/temp/fileflows:/temp
-      - /mnt/user/data:/media
+      - /opt/stacks/fileflows/data:/app/Data
+      - /opt/stacks/fileflows/logs:/app/Logs
+      - /mnt/nas/temp/fileflows:/temp
+      - /mnt/nas/data:/media
     environment:
       - TZ=America/Phoenix
       - PUID=99
@@ -23,5 +23,5 @@ services:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/revenz/FileFlowsUnraid/master/icon.png
 
 networks:
-  rzp-net:
+  traefik:
     external: true

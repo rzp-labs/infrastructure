@@ -16,30 +16,29 @@ networks:
 include:
 
   # external stack
-  # - copyparty/docker-compose.yml
+  - copyparty/docker-compose.yml
   - dockge/docker-compose.yml
   - dozzle/docker-compose.yml
   # - fileflows/docker-compose.yml
   - flaresolverr/docker-compose.yml
-  # - huntarr/docker-compose.yml
+  - huntarr/docker-compose.yml
   # - jdownloader2/docker-compose.yml
   # - lidarr/docker-compose.yml
-  # - netdata/docker-compose.yml
-  # - nzbhydra2/docker-compose.yml
+  - netdata/docker-compose.yml
+  - nzbhydra2/docker-compose.yml
   # - overseerr/docker-compose.yml
   # - plex-media-server/docker-compose.yml
-  # - prowlarr/docker-compose.yml
+  - prowlarr/docker-compose.yml
   # - profilarr/docker-compose.yml
-  # - radarr/docker-compose.yml
-  # - sabnzbd/docker-compose.yml
+  - radarr/docker-compose.yml
+  - sabnzbd/docker-compose.yml
   - sonarr/docker-compose.yml
   - traefik/docker-compose.yml
-  - zitadel/docker-compose.yml
 
   # internal stacks
-  - docker-socket-proxy/docker-compose.yml
+  # - docker-socket-proxy/docker-compose.yml
   # - namer/docker-compose.yml
   - stash/docker-compose.yml
   # - stash-hub/docker-compose.yml
-  # - stash-vr/docker-compose.yml
-  # - whisparr/docker-compose.yml
+  - stash-vr/docker-compose.yml
+  - whisparr/docker-compose.yml

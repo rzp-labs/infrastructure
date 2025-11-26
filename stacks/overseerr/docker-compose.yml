@@ -4,11 +4,11 @@ services:
     container_name: overseerr
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 5055:5055
     volumes:
-      - /mnt/user/appdata/overseerr:/app/config
+      - /opt/stacks/overseerr:/app/config
     environment:
       - LOG_LEVEL=info
       - UMASK=000
@@ -20,5 +20,5 @@ services:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/diamkil/docker-templates/master/diamkil/images/os_logo_square.png
 
 networks:
-  rzp-net:
+  traefik:
     external: true

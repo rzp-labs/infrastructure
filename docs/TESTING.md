@@ -36,11 +36,10 @@ infrastructure/
 **Purpose**: Comprehensive deployment and authentication verification
 
 **What it tests**:
-1. Complete stack deployment (docker-bootstrap playbook)
+1. Complete stack deployment (docker-bootstrap meta-playbook)
 2. Service health checks (all containers running)
-3. Authentication flow (oauth2-proxy + Zitadel integration)
-4. Network isolation (Zitadel not externally accessible)
-5. SSL certificate acquisition
+3. Network isolation for core proxy and service networks
+4. SSL certificate acquisition
 
 **When to run**: Before any deployment to verify changes work
 
@@ -110,6 +109,8 @@ molecule test
 ```
 
 ## Test Configuration
+
+> **Note:** Many examples in this document refer to the original Zitadel + oauth2-proxy authentication stack. The current active scenarios (e.g. `services`) focus on foundation + services deployment without a centralized IdP.
 
 ### molecule.yml
 

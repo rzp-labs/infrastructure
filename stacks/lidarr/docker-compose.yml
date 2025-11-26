@@ -4,13 +4,13 @@ services:
     container_name: lidarr
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 8686:8686
     volumes:
-      - /mnt/user/appdata/lidarr:/config
-      - /mnt/user/downloads/02_processing:/music
-      - /mnt/user/downloads/01_incomplete:/downloads
+      - /opt/stacks/lidarr:/config
+      - /mnt/nas/downloads/02_processing:/music
+      - /mnt/nas/downloads/01_incomplete:/downloads
     environment:
       - PUID=99
       - PGID=100
@@ -21,5 +21,5 @@ services:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/lidarr-logo.png
 
 networks:
-  rzp-net:
+  traefik:
     external: true

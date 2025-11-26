@@ -1,0 +1,48 @@
+---
+- name: Bootstrap foundation infrastructure (socket proxy only)
+  hosts: homelab
+  become: true
+  gather_facts: false
+
+  vars:
+    bootstrap_networks:
+      - traefik
+      - socket-proxy
+
+  tasks:
+    - name: Ensure foundation networks exist
+      community.docker.docker_network:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ bootstrap_networks }}"
+
+    - name: Ensure docker-socket-proxy container is running
+      community.docker.docker_container:
+        name: docker-socket-proxy
+        image: tecnativa/docker-socket-proxy:latest
+        restart_policy: unless-stopped
+        networks:
+          - name: socket-proxy
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock:ro
+        env:
+          CONTAINERS: "1"
+          NETWORKS: "1"
+          SERVICES: "1"
+          TASKS: "1"
+          POST: "0"
+          BUILD: "0"
+          COMMIT: "0"
+          CONFIGS: "0"
+          DISTRIBUTION: "0"
+          EXEC: "0"
+          IMAGES: "0"
+          INFO: "1"
+          NODES: "0"
+          PLUGINS: "0"
+          SECRETS: "0"
+          SESSION: "0"
+          SWARM: "0"
+          SYSTEM: "0"
+          VOLUMES: "0"
+        state: started

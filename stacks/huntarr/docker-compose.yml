@@ -4,18 +4,22 @@ services:
     container_name: huntarr
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 9705:9705
     volumes:
-      - /mnt/user/appdata/Huntarr:/config
+      - /opt/stacks/huntarr:/config
     environment:
       - BASE_URL=
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:9705]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/plexguide/Huntarr.io/main/frontend/static/logo/512.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.huntarr.entrypoints=websecure"
+      - "traefik.http.routers.huntarr.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.huntarr.tls.certresolver=cloudflare"
+      - "traefik.http.routers.huntarr.rule=Host(`huntarr.${DOMAIN}`)"
+      - "traefik.http.services.huntarr.loadbalancer.server.port=9705"
 
 networks:
-  rzp-net:
+  traefik:
     external: true

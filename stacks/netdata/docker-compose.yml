@@ -12,9 +12,9 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
-      - /mnt/user/appdata/netdata/config:/etc/netdata
-      - /mnt/user/appdata/netdata/lib:/var/lib/netdata
-      - /mnt/user/appdata/netdata/cache:/var/cache/netdata
+      - /opt/stacks/netdata/config:/etc/netdata
+      - /opt/stacks/netdata/lib:/var/lib/netdata
+      - /opt/stacks/netdata/cache:/var/cache/netdata
       - /etc/passwd:/host/etc/passwd:ro
       - /etc/group:/host/etc/group:ro
       - /etc/localtime:/etc/localtime:ro

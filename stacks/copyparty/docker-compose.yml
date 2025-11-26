@@ -5,25 +5,24 @@ services:
     restart: unless-stopped
     user: 99:100
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 3923:3923
     volumes:
-      - /mnt/user/appdata/copyparty/config:/cfg
-      - /mnt/user/data:/w
+      - /opt/stacks/copyparty/config:/cfg
+      - /mnt/nas/data:/w
     environment:
       LD_PRELOAD: /usr/lib/libmimalloc-secure.so.2
       PYTHONUNBUFFERED: 1
     stop_grace_period: 15s
     labels:
-      - net.unraid.docker.webui=http://[IP]:[PORT:3923]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/9001/copyparty/master/docs/ico/splash.png
-      - net.unraid.docker.managed=dockerman
-      - org.opencontainers.image.description=Portable file server with
-        accelerated resumable uploads
-      - org.opencontainers.image.title=CopyParty
-      - org.opencontainers.image.documentation=https://github.com/9001/copyparty
-      - org.opencontainers.image.source=https://github.com/9001/copyparty
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.copyparty.entrypoints=websecure"
+      - "traefik.http.routers.copyparty.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.copyparty.tls.certresolver=cloudflare"
+      - "traefik.http.routers.copyparty.rule=Host(`copyparty.${DOMAIN}`)"
+      - "traefik.http.services.copyparty.loadbalancer.server.port=3923"
     healthcheck:
       test:
         - CMD-SHELL
@@ -33,5 +32,5 @@ services:
       retries: 5
       start_period: 15s
 networks:
-  rzp-net:
+  traefik:
     external: true

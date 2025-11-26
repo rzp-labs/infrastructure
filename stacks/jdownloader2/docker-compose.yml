@@ -4,13 +4,13 @@ services:
     container_name: jdownloader2
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 7807:5800
       - 7907:5900
     volumes:
-      - /mnt/user/appdata/JDownloader2:/config
-      - /mnt/user/data/media/downloads:/output
+      - /opt/stacks/jdownloader2:/config
+      - /mnt/nas/data/media/downloads:/output
     environment:
       - USER_ID=99
       - GROUP_ID=100
@@ -35,5 +35,5 @@ services:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/jlesage/docker-templates/master/jlesage/images/jdownloader-2-icon.png
 
 networks:
-  rzp-net:
+  traefik:
     external: true

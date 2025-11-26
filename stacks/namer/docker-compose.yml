@@ -4,7 +4,7 @@ services:
     container_name: namer-sdb
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 6980:6980
     devices:
@@ -12,10 +12,10 @@ services:
     group_add:
       - "18" # video group for GPU access
     volumes:
-      - /mnt/user/appdata/namer-sdb/config:/app/config
-      - /mnt/user/appdata/namer-sdb/database:/app/database
-      - /mnt/user/appdata/namer-sdb/logs:/app/logs
-      - /mnt/user/data/media/namer-sdb:/app/media
+      - /opt/stacks/namer-sdb/config:/app/config
+      - /opt/stacks/namer-sdb/database:/app/database
+      - /opt/stacks/namer-sdb/logs:/app/logs
+      - /mnt/nas/data/media/namer-sdb:/app/media
     environment:
       - NAMER_CONFIG=/app/config/namer-sdb.cfg
       - TZ=${TZ}
@@ -39,7 +39,7 @@ services:
     container_name: namer-pdb
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 6981:6980
     devices:
@@ -47,10 +47,10 @@ services:
     group_add:
       - "18" # video group for GPU access
     volumes:
-      - /mnt/user/appdata/namer-pdb/config:/app/config
-      - /mnt/user/appdata/namer-pdb/database:/app/database
-      - /mnt/user/appdata/namer-pdb/logs:/app/logs
-      - /mnt/user/data/media/namer-pdb:/app/media
+      - /opt/stacks/namer-pdb/config:/app/config
+      - /opt/stacks/namer-pdb/database:/app/database
+      - /opt/stacks/namer-pdb/logs:/app/logs
+      - /mnt/nas/data/media/namer-pdb:/app/media
     environment:
       - NAMER_CONFIG=/app/config/namer-pdb.cfg
       - TZ=${TZ}
@@ -69,5 +69,5 @@ services:
       retries: 3
       start_period: 60s
 networks:
-  rzp-net:
+  traefik:
     external: true

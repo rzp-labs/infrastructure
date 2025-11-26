@@ -14,7 +14,7 @@ services:
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.prowlarr.tls=true"
       - "traefik.http.routers.prowlarr.entrypoints=websecure"
-      - "traefik.http.routers.prowlarr.middlewares=traefik-auth"
+      - "traefik.http.routers.prowlarr.middlewares=internal@file,secure-headers@file"
       - "traefik.http.routers.prowlarr.tls.certresolver=cloudflare"
       - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)"
       - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"

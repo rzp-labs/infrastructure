@@ -4,21 +4,25 @@ services:
     container_name: nzbhydra2
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 5076:5076
     volumes:
-      - /mnt/user/appdata/nzbhydra2:/config
-      - /mnt/user/data/usenet:/data/downloads
+      - /opt/stacks/nzbhydra2:/config
+      - /mnt/nas/data/usenet:/data/downloads
     environment:
       - PUID=99
       - PGID=100
       - UMASK=022
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:5076]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/nzbhydra2-logo.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.nzbhydra2.entrypoints=websecure"
+      - "traefik.http.routers.nzbhydra2.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.nzbhydra2.tls.certresolver=cloudflare"
+      - "traefik.http.routers.nzbhydra2.rule=Host(`nzbhydra2.${DOMAIN}`)"
+      - "traefik.http.services.nzbhydra2.loadbalancer.server.port=5076"
 
 networks:
-  rzp-net:
+  traefik:
     external: true
