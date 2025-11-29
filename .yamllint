@@ -22,5 +22,6 @@ ignore: |
   .ansible/
   .venv/
   venv/
+  .venv-container/
   .git/
   collections/

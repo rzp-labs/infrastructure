@@ -152,11 +152,6 @@ docker-doctor: ## Prune unused Docker artifacts on homelab host
 	uv run python scripts/update_known_hosts.py
 	scripts/ansible_exec.sh ansible-playbook playbooks/docker-doctor.yml
 
-docker-deploy-bootstrap: ## Deploy bootstrap stage (socket proxy + Zitadel)
-	@echo "Deploying bootstrap stage..."
-	uv run python scripts/update_known_hosts.py
-	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-bootstrap.yml
-
 docker-deploy-services: ## Deploy services stage (Traefik + dependents)
 	@echo "Deploying services stage..."
 	uv run python scripts/update_known_hosts.py
