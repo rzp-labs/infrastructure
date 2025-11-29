@@ -1,9 +1,18 @@
 ---
 services:
   traefik:
-    image: traefik:v3.2
+    image: traefik:latest
     container_name: traefik
     restart: unless-stopped
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    networks:
+      - socket-proxy
+      - traefik
+    ports:
+      - "80:80"
+      - "443:443"
     security_opt:
       - no-new-privileges:true
     command:
@@ -12,22 +21,16 @@ services:
       - --certificatesresolvers.cloudflare.acme.dnschallenge.propagationtimeout=600s
       - --certificatesresolvers.cloudflare.acme.dnschallenge.pollinginterval=10s
       - --log.level=DEBUG
-    networks:
-      - socket-proxy
-      - traefik
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
-      - ACME_EMAIL=${ACME_EMAIL}
-      - DOMAIN=${DOMAIN}
-      - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./traefik.yml:/traefik.yml:ro
       - /opt/stacks/traefik/acme.json:/acme.json
       - ./config:/config:ro
+    environment:
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
+      - ACME_EMAIL=${ACME_EMAIL}
+      - DOMAIN=${DOMAIN}
+      - TZ=${TZ}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=http"

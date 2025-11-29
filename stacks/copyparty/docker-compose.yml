@@ -1,20 +1,20 @@
+---
 services:
   copyparty:
     image: copyparty/iv:latest
     container_name: copyparty
     restart: unless-stopped
-    user: 99:100
     networks:
       - traefik
-    ports:
-      - 3923:3923
     volumes:
       - /opt/stacks/copyparty/config:/cfg
       - /mnt/nas/data:/w
-    environment:
-      LD_PRELOAD: /usr/lib/libmimalloc-secure.so.2
-      PYTHONUNBUFFERED: 1
     stop_grace_period: 15s
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - LD_PRELOAD=/usr/lib/libmimalloc-secure.so.2
+      - PYTHONUNBUFFERED=1
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
@@ -31,6 +31,7 @@ services:
       timeout: 2s
       retries: 5
       start_period: 15s
+
 networks:
   traefik:
     external: true

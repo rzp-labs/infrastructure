@@ -1,3 +1,4 @@
+---
 services:
   jdownloader2:
     image: jlesage/jdownloader-2:latest
@@ -12,8 +13,8 @@ services:
       - /opt/stacks/jdownloader2:/config
       - /mnt/nas/data/media/downloads:/output
     environment:
-      - USER_ID=99
-      - GROUP_ID=100
+      - USER_ID=1000
+      - GROUP_ID=1000
       - UMASK=0002
       - DISPLAY_WIDTH=1920
       - DISPLAY_HEIGHT=1080
@@ -30,9 +31,13 @@ services:
       - MYJDOWNLOADER_DEVICE_NAME=unRAID
       - JDOWNLOADER_HEADLESS=0
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:7807]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/jlesage/docker-templates/master/jlesage/images/jdownloader-2-icon.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.jdownloader2.entrypoints=websecure"
+      - "traefik.http.routers.jdownloader2.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.jdownloader2.tls.certresolver=cloudflare"
+      - "traefik.http.routers.jdownloader2.rule=Host(`jdownloader2.${DOMAIN}`)"
+      - "traefik.http.services.jdownloader2.loadbalancer.server.port=5800"
 
 networks:
   traefik:

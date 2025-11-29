@@ -1,3 +1,4 @@
+---
 services:
   sabnzbd:
     image: lscr.io/linuxserver/sabnzbd:latest
@@ -12,9 +13,8 @@ services:
       - /mnt/nas/data/usenet:/data/usenet
       - /opt/stacks/sabnzbd/scripts:/scripts
     environment:
-      - PUID=99
-      - PGID=100
-      - UMASK=022
+      - PUID=1000
+      - PGID=1000
       - INSTALL_PACKAGES=clamav-daemon
     labels:
       - "traefik.enable=true"

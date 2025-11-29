@@ -1,9 +1,10 @@
+---
 services:
   netdata:
     image: netdata/netdata:latest
     container_name: netdata
     restart: unless-stopped
-    hostname: unraid
+    hostname: docker
     network_mode: host
     pid: host
     cap_add:
@@ -32,6 +33,10 @@ services:
       - NETDATA_CLAIM_ROOMS=${NETDATA_CLAIM_ROOMS}
       - NETDATA_EXTRA_DEB_PACKAGES=apcupsd lm-sensors
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:19999/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/Data-Monkey/docker-templates/master/Data-Monkey/img/netdata.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.netdata.entrypoints=websecure"
+      - "traefik.http.routers.netdata.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.netdata.tls.certresolver=cloudflare"
+      - "traefik.http.routers.netdata.rule=Host(`netdata.${DOMAIN}`)"
+      - "traefik.http.services.netdata.loadbalancer.server.port=19999"

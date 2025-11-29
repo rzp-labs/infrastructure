@@ -1,3 +1,4 @@
+---
 services:
   whisparr:
     image: ghcr.io/hotio/whisparr:v3
@@ -17,9 +18,8 @@ services:
       - /opt/stacks/whisparr:/config
       - /mnt/nas/data:/data
     environment:
-      - PUID=99
-      - PGID=100
-      - UMASK=0002
+      - PUID=1000
+      - PGID=1000
       - PRIVOXY_ENABLED=false
       - UNBOUND_ENABLED=false
       - VPN_ENABLED=false

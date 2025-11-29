@@ -1,3 +1,4 @@
+---
 services:
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -5,15 +6,13 @@ services:
     restart: unless-stopped
     networks:
       - traefik
-    ports:
-      - 7878:7878
     volumes:
       - /opt/stacks/radarr:/config
       - /mnt/nas/data:/data
     environment:
-      - PUID=99
-      - PGID=100
-      - UMASK=022
+      - PUID=1000
+      - PGID=1000
+
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"

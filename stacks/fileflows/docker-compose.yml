@@ -1,3 +1,4 @@
+---
 services:
   fileflows:
     image: revenz/fileflows:stable
@@ -5,22 +6,24 @@ services:
     restart: unless-stopped
     networks:
       - traefik
-    ports:
-      - 8585:5000
     volumes:
       - /opt/stacks/fileflows/data:/app/Data
       - /opt/stacks/fileflows/logs:/app/Logs
-      - /mnt/nas/temp/fileflows:/temp
+      - /opt/stacks/fileflows/tmp:/tmp
       - /mnt/nas/data:/media
     environment:
-      - TZ=America/Phoenix
-      - PUID=99
-      - PGID=100
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
       - NVIDIA_VISIBLE_DEVICES=all
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:8585]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/revenz/FileFlowsUnraid/master/icon.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.fileflows.entrypoints=websecure"
+      - "traefik.http.routers.fileflows.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.fileflows.tls.certresolver=cloudflare"
+      - "traefik.http.routers.fileflows.rule=Host(`fileflows.${DOMAIN}`)"
+      - "traefik.http.services.fileflows.loadbalancer.server.port=5000"
 
 networks:
   traefik:

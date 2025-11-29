@@ -1,3 +1,4 @@
+---
 services:
   huntarr:
     image: huntarr/huntarr:latest
@@ -5,8 +6,6 @@ services:
     restart: unless-stopped
     networks:
       - traefik
-    ports:
-      - 9705:9705
     volumes:
       - /opt/stacks/huntarr:/config
     environment:

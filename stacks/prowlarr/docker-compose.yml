@@ -4,7 +4,9 @@ services:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     restart: unless-stopped
-    user: "99:100"
+    environment:
+      - PUID=1000
+      - PGID=1000
     networks:
       - traefik
     volumes:

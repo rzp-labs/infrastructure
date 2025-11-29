@@ -4,6 +4,12 @@ services:
     image: louislam/dockge:1
     container_name: dockge # Added a name for clarity
     restart: unless-stopped
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    networks:
+      - socket-proxy
+      - traefik
     volumes:
       # Dockge data directory
       - /opt/stacks/dockge/data:/app/data
@@ -16,9 +22,6 @@ services:
       - DOCKER_HOST=tcp://docker-socket-proxy:2375
       # Ensure you include variables from your root .env file if needed
       - DOMAIN=${DOMAIN}
-    networks:
-      - socket-proxy
-      - traefik
     # 2. ADD LABELS: Tell Traefik how to route traffic to this container
     labels:
       - "traefik.enable=true"
@@ -31,3 +34,8 @@ services:
       # Specify the port Dockge listens on internally (5001) for Traefik to route to
       - "traefik.http.services.dockge.loadbalancer.server.port=5001"
 
+networks:
+  socket-proxy:
+    external: true
+  traefik:
+    external: true

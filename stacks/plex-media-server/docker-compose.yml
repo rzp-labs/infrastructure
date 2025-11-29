@@ -1,3 +1,4 @@
+---
 services:
   plex:
     image: plexinc/pms-docker:latest
@@ -5,15 +6,20 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /mnt/user/appdata/Plex-Media-Server:/config
+      - /opt/stacks/plex-media-server:/config
       - /dev/shm/transcode:/transcode
-      - /mnt/user/data/media:/data/media
+      - /mnt/nas/data/media:/data/media
     environment:
       - PLEX_CLAIM=${PLEX_CLAIM}
-      - PLEX_UID=99
-      - PLEX_GID=100
+      - PLEX_UID=1000
+      - PLEX_GID=1000
       - VERSION=latest
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:32400/web
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/plexinc/pms-docker/master/img/plex-server.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.plex.tls=true"
+      - "traefik.http.routers.plex.entrypoints=websecure"
+      - "traefik.http.routers.plex.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.plex.tls.certresolver=cloudflare"
+      - "traefik.http.routers.plex.rule=Host(`plex.${DOMAIN}`)"
+      - "traefik.http.services.plex.loadbalancer.server.port=32400"

@@ -1,3 +1,4 @@
+---
 services:
   nzbhydra2:
     image: lscr.io/linuxserver/nzbhydra2:latest
@@ -5,15 +6,12 @@ services:
     restart: unless-stopped
     networks:
       - traefik
-    ports:
-      - 5076:5076
     volumes:
       - /opt/stacks/nzbhydra2:/config
       - /mnt/nas/data/usenet:/data/downloads
     environment:
-      - PUID=99
-      - PGID=100
-      - UMASK=022
+      - PUID=1000
+      - PGID=1000
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"

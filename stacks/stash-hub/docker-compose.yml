@@ -3,11 +3,17 @@ services:
   stash-hub:
     image: the-stash-hub:latest
     container_name: stash-hub
-    user: "99:100"
     volumes:
       - /opt/stacks/stash-hub/data:/app/data
+      - /opt/stacks/stash-hub/logs:/app/backend/logs
+      - /opt/stacks/stash-hub/backend_data:/app/backend/data
+      - /opt/stacks/stash-hub/stream_endpoints:/app/backend/static/stream_endpoints
+      - /opt/stacks/stash-hub/db:/app/backend/db
       - /opt/stacks/stash-hub/src/utils:/app/frontend/dist/utils:ro
     environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
       - FLASK_APP=backend/app.py
       - FLASK_ENV=production
       - APP_FRONTEND_DIR=/app/frontend/dist
@@ -24,3 +30,7 @@ services:
       - "traefik.http.routers.stash-hub.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash-hub.rule=Host(`hub.${DOMAIN}`)"
       - "traefik.http.services.stash-hub.loadbalancer.server.port=7001"
+
+networks:
+  traefik:
+    external: true
