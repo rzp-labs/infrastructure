@@ -29,7 +29,7 @@
                   molecule-infra:
                     ansible_host: localhost
                     ansible_port: 32222
-                    ansible_user: admin
+                    ansible_user: rzp-admin
                     ansible_ssh_private_key_file: "{{ lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true) }}"
                     ansible_python_interpreter: /usr/bin/python3
         mode: '0644'
@@ -172,44 +172,45 @@
         - "CLOUDFLARE_DNS_API_TOKEN=test-token"
         - "ACME_EMAIL=test@test.local"
         - "TZ=UTC"
+        - "DOCKER_USER=1000:1000"
 
-    - name: Ensure admin user exists for Ansible parity
+    - name: Ensure rzp-admin user exists for Ansible parity
       ansible.builtin.user:
-        name: admin
+        name: rzp-admin
         shell: /bin/bash
         groups: sudo
         append: true
         create_home: true
         state: present
 
-    - name: Allow admin passwordless sudo
+    - name: Allow rzp-admin passwordless sudo
       ansible.builtin.copy:
-        dest: /etc/sudoers.d/99-admin
-        content: "admin ALL=(ALL) NOPASSWD:ALL\n"
+        dest: /etc/sudoers.d/99-rzp-admin
+        content: "rzp-admin ALL=(ALL) NOPASSWD:ALL\n"
         owner: root
         group: root
         mode: "0440"
 
-    - name: Ensure admin SSH directory exists
+    - name: Ensure rzp-admin SSH directory exists
       ansible.builtin.file:
-        path: /home/admin/.ssh
+        path: /home/rzp-admin/.ssh
         state: directory
-        owner: admin
-        group: admin
+        owner: rzp-admin
+        group: rzp-admin
         mode: "0700"
 
-    - name: Load Orbstack public key for admin access
+    - name: Load Orbstack public key for rzp-admin access
       ansible.builtin.set_fact:
         admin_authorized_key: "{{ lookup('file', (lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true)) + '.pub') }}"
       delegate_to: localhost
       run_once: true
 
-    - name: Install admin authorized_keys
+    - name: Install rzp-admin authorized_keys
       ansible.builtin.copy:
         content: "{{ admin_authorized_key | default('') }}"
-        dest: /home/admin/.ssh/authorized_keys
-        owner: admin
-        group: admin
+        dest: /home/rzp-admin/.ssh/authorized_keys
+        owner: rzp-admin
+        group: rzp-admin
         mode: "0600"
       when: admin_authorized_key is defined and admin_authorized_key | length > 0
 
