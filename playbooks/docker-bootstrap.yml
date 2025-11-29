@@ -1,4 +1,4 @@
 ---
-- import_playbook: docker-bootstrap-foundation.yml
-- import_playbook: docker-deploy-services.yml
-- import_playbook: docker-check-health.yml
+- import_playbook: docker-bootstrap-foundation.yml # noqa: name[play]
+- import_playbook: docker-deploy-services.yml # noqa: name[play]
+- import_playbook: docker-check-health.yml # noqa: name[play]
