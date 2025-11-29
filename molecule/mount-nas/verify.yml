@@ -1,0 +1,46 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Check if mount unit override exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/mnt-nas-data.mount.d/override.conf
+      register: mount_override
+
+    - name: Assert mount unit override exists
+      ansible.builtin.assert:
+        that: mount_override.stat.exists
+
+    - name: Read mount unit override
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/mnt-nas-data.mount.d/override.conf
+      register: mount_override_content
+
+    - name: Verify mount unit override content
+      ansible.builtin.assert:
+        that:
+          - "'ExecStartPre=/bin/sh -c' in (mount_override_content.content | b64decode)"
+          - "'ping -c1 -w1' in (mount_override_content.content | b64decode)"
+          - "'NFS Server unreachable' in (mount_override_content.content | b64decode)"
+
+    - name: Check if Docker service override exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/docker.service.d/override.conf
+      register: docker_override
+
+    - name: Assert Docker service override exists
+      ansible.builtin.assert:
+        that: docker_override.stat.exists
+
+    - name: Read Docker service override
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/docker.service.d/override.conf
+      register: docker_override_content
+
+    - name: Verify Docker service override content
+      ansible.builtin.assert:
+        that:
+          - "'RequiresMountsFor=/mnt/nas/data' in (docker_override_content.content | b64decode)"

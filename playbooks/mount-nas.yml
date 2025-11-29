@@ -27,7 +27,7 @@
       changed_when: false
 
 - name: Ensure NAS automount is configured and healthy
-  hosts: docker
+  hosts: homelab
   become: true
   gather_facts: false
 
@@ -41,7 +41,7 @@
       - _netdev
       - nofail
       - hard
-      - intr
+      - hard
       - rsize=1048576
       - wsize=1048576
     nas_automount_idle_timeout_sec: 600
@@ -142,6 +142,42 @@
           [Install]
           WantedBy=multi-user.target
 
+    - name: Create systemd override directory for NAS mount
+      ansible.builtin.file:
+        path: "{{ nas_mount_unit_path }}.d"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy systemd override for NAS mount hardening
+      ansible.builtin.copy:
+        dest: "{{ nas_mount_unit_path }}.d/override.conf"
+        mode: "0644"
+        content: |
+          [Unit]
+          After=network-online.target
+          Wants=network-online.target
+          StartLimitBurst=10
+
+          [Mount]
+          # Wait for NFS server with 30s timeout
+          ExecStartPre=/bin/sh -c "count=0; until ping -c1 -w1 {{ nas_remote_host }}; do sleep 1; count=$((count+1)); if [ $count -ge 30 ]; then echo 'NFS Server unreachable'; exit 1; fi; done"
+      notify: Reload systemd
+
+    - name: Ensure Docker service override directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Configure Docker to wait for NAS mount
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker.service.d/override.conf
+        mode: "0644"
+        content: |
+          [Unit]
+          RequiresMountsFor={{ nas_mount_point }}
+      notify: Restart docker
+
     - name: Deploy systemd automount unit for NAS share
       ansible.builtin.copy:
         dest: "{{ nas_automount_unit_path }}"
@@ -166,11 +202,13 @@
         name: "{{ nas_unit_basename }}.automount"
         enabled: true
         state: started
+      when: nas_start_automount | default(true)
 
     - name: Ensure NAS mount is active
       ansible.builtin.systemd:
         name: "{{ nas_unit_basename }}.mount"
         state: started
+      when: not nas_skip_mount_activation | default(false)
 
     - name: Verify NAS path is reachable
       ansible.builtin.command:
@@ -198,3 +236,14 @@
     - name: Record successful NAS mount setup
       ansible.builtin.debug:
         msg: "NAS share {{ nas_remote }} is mounted at {{ nas_mount_point }} via systemd automount"
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart docker
+      ansible.builtin.service:
+        name: docker
+        state: restarted
+
