@@ -3,6 +3,9 @@ services:
   stash-vr:
     image: ofl0w/stash-vr:latest
     container_name: stash-vr
+    depends_on:
+      stash:
+        condition: service_healthy
     restart: unless-stopped
     environment:
       - PUID=1000

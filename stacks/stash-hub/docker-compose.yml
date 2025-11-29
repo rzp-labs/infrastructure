@@ -3,6 +3,9 @@ services:
   stash-hub:
     image: the-stash-hub:latest
     container_name: stash-hub
+    depends_on:
+      stash:
+        condition: service_healthy
     volumes:
       - /opt/stacks/stash-hub/data:/app/data
       - /opt/stacks/stash-hub/logs:/app/backend/logs
