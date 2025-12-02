@@ -2,6 +2,7 @@
 - name: Prepare control node for NAS mount automation
   hosts: localhost
   gather_facts: false
+  become: false
 
   vars:
     nas_known_hosts_dir: "{{ lookup('env', 'HOME') }}/.ssh"
@@ -26,24 +27,40 @@
       when: hostvars[item] is defined and (hostvars[item].ansible_host | default('')) | length > 0
       changed_when: false
 
+    - name: Ensure cifs-utils is installed on target hosts
+      delegate_to: "{{ item }}"
+      ansible.builtin.apt:
+        name: cifs-utils
+        state: present
+        update_cache: true
+      loop: "{{ groups['homelab'] }}"
+      become: true
+
 - name: Ensure NAS automount is configured and healthy
   hosts: homelab
   become: true
   gather_facts: false
 
   vars:
+    # SMB Credentials from .env
+    nas_user: "{{ lookup('ini', 'NAS_USER', type='properties', file=playbook_dir + '/../stacks/.env') }}"
+    nas_password: "{{ lookup('ini', 'NAS_PASSWORD', type='properties', file=playbook_dir + '/../stacks/.env') }}"
+
     nas_mount_point: /mnt/nas/data
-    nas_export_path: /mnt/user/data
+    nas_export_path: /data
     nas_remote_host: "{{ hostvars.get('nas', {}).ansible_host | default('') }}"
-    nas_remote: "{{ nas_remote_host }}:{{ nas_export_path }}"
-    nas_fstype: nfs
+    nas_remote: "//{{ nas_remote_host }}{{ nas_export_path }}"
+    nas_fstype: cifs
     nas_mount_options:
       - _netdev
       - nofail
-      - hard
-      - hard
-      - rsize=1048576
-      - wsize=1048576
+      - credentials=/etc/smb_credentials
+      - uid=1000
+      - gid=1000
+      - iocharset=utf8
+      - vers=3.0
+      - mapchars
+      - noserverino
     nas_automount_idle_timeout_sec: 600
     nas_verify_writable: true
 
@@ -63,10 +80,10 @@
       delay: 2
       until: nas_ping_result.rc == 0
 
-    - name: Pre-check | Ensure NAS NFS port is reachable
+    - name: Pre-check | Ensure NAS SMB port is reachable
       ansible.builtin.wait_for:
         host: "{{ nas_remote_host }}"
-        port: 2049
+        port: 445
         timeout: 10
         sleep: 2
         state: started
@@ -123,6 +140,15 @@
             mode: "0755"
           when: not nas_mount_stat.stat.exists
 
+    - name: Create SMB credentials file
+      ansible.builtin.copy:
+        dest: /etc/smb_credentials
+        mode: "0600"
+        content: |
+          username={{ nas_user }}
+          password={{ nas_password }}
+      no_log: true
+
     - name: Deploy systemd mount unit for NAS share
       ansible.builtin.copy:
         dest: "{{ nas_mount_unit_path }}"
@@ -169,14 +195,23 @@
         state: directory
         mode: "0755"
 
-    - name: Configure Docker to wait for NAS mount
+    - name: Configure Docker to wait for NAS mount (soft dependency)
       ansible.builtin.copy:
         dest: /etc/systemd/system/docker.service.d/override.conf
         mode: "0644"
         content: |
           [Unit]
-          RequiresMountsFor={{ nas_mount_point }}
+          After={{ nas_unit_basename }}.mount
       notify: Restart docker
+
+    - name: Protect NAS mount point (immutable)
+      ansible.builtin.file:
+        path: "{{ nas_mount_point }}"
+        attributes: "+i"
+        state: directory
+      when: not nas_mount_stat.stat.exists or (nas_mount_stat.stat.exists and not nas_mount_stat.stat.writeable)
+      ignore_errors: true # Ignore if already mounted and cannot change attributes
+
 
     - name: Deploy systemd automount unit for NAS share
       ansible.builtin.copy:
@@ -246,4 +281,3 @@
       ansible.builtin.service:
         name: docker
         state: restarted
-

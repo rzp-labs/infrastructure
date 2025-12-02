@@ -12,6 +12,9 @@
       - socket-proxy
     services_containers:
       - traefik
+      - sabnzbd
+      - stash
+      - stash-hub
 
   tasks:
     - name: Load GHCR credentials from .env
@@ -156,6 +159,12 @@
         - services_allow_fake_dri | default(false) | bool
         - not (ansible_check_mode | default(false))
 
+    - name: Load Stash Hub image from tarball
+      community.docker.docker_image_load:
+        path: /home/rzp-admin/the-stash-hub-latest.tar
+      when:
+        - not (ansible_check_mode | default(false))
+
     - name: Deploy services compose project (root orchestrator, full GPU)
       ansible.builtin.shell: |
         cd "{{ stacks_dest_dir }}"
@@ -200,3 +209,84 @@
     - name: Report services deployment result
       ansible.builtin.debug:
         msg: "Services stacks deployed successfully"
+
+    - name: Configure SABnzbd to suppress warnings and handle illegal characters
+      block:
+        - name: Wait for SABnzbd config file to be generated
+          ansible.builtin.wait_for:
+            path: "{{ stacks_dest_dir }}/sabnzbd/sabnzbd.ini"
+            state: present
+            timeout: 300
+
+        - name: Disable helpful_warnings in sabnzbd.ini
+          ansible.builtin.lineinfile:
+            path: "{{ stacks_dest_dir }}/sabnzbd/sabnzbd.ini"
+            regexp: '^helpful_warnings ='
+            line: 'helpful_warnings = 0'
+          register: sabnzbd_warnings
+
+        - name: Enable replace_illegal in sabnzbd.ini
+          ansible.builtin.lineinfile:
+            path: "{{ stacks_dest_dir }}/sabnzbd/sabnzbd.ini"
+            regexp: '^replace_illegal ='
+            line: 'replace_illegal = 1'
+            insertafter: '\[misc\]'
+          register: sabnzbd_illegal
+
+        - name: Restart SABnzbd to apply config changes
+          community.docker.docker_container:
+            name: sabnzbd
+            state: started
+            restart: true
+          when: sabnzbd_warnings.changed or sabnzbd_illegal.changed
+      when:
+        - "'sabnzbd' in services_containers"
+        - not (ansible_check_mode | default(false))
+
+    - name: Configure Stash-Hub connectivity
+      block:
+        - name: Wait for Stash config file to be generated
+          ansible.builtin.wait_for:
+            path: "{{ stacks_dest_dir }}/stash/config/config.yml"
+            state: present
+            timeout: 300
+
+        - name: Read Stash config file
+          ansible.builtin.slurp:
+            src: "{{ stacks_dest_dir }}/stash/config/config.yml"
+          register: stash_config_file
+
+        - name: Extract Stash API key
+          ansible.builtin.set_fact:
+            stash_api_key: "{{ (stash_config_file['content'] | b64decode | from_yaml).api_key }}"
+
+        - name: Update Stash-Hub database configuration
+          ansible.builtin.shell: |
+            docker exec stash-hub python3 -c "
+            import sqlite3
+            conn = sqlite3.connect('/app/data/main.db')
+            cursor = conn.cursor()
+            cursor.execute('SELECT endpoint, api_key FROM stash_config WHERE id=1')
+            row = cursor.fetchone()
+            if row and (row[0] != 'stash' or row[1] != '{{ stash_api_key }}'):
+                cursor.execute('UPDATE stash_config SET endpoint = ?, api_key = ? WHERE id = 1', ('stash', '{{ stash_api_key }}'))
+                conn.commit()
+                print('changed')
+            conn.close()
+            "
+          register: stash_hub_db_update
+          changed_when: "'changed' in stash_hub_db_update.stdout"
+
+        - name: Restart Stash-Hub to apply config changes
+          community.docker.docker_container:
+            name: stash-hub
+            state: started
+            restart: true
+          when: stash_hub_db_update.changed
+
+      when:
+        - "'stash' in services_containers"
+        - "'stash-hub' in services_containers"
+        - not (ansible_check_mode | default(false))
+
+
