@@ -27,7 +27,7 @@ services:
       # - LOG_LEVEL="debug"
       # - DISABLE_LOG_COLOR="true"
 
-      - FORCE_HTTPS=true
+      # - FORCE_HTTPS=true
     networks:
       - traefik
     ports:

@@ -3,6 +3,9 @@ services:
   lidarr:
     image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
+    depends_on:
+      prowlarr:
+        condition: service_started
     restart: unless-stopped
     networks:
       - traefik

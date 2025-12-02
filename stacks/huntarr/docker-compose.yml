@@ -3,6 +3,9 @@ services:
   huntarr:
     image: huntarr/huntarr:latest
     container_name: huntarr
+    depends_on:
+      prowlarr:
+        condition: service_started
     restart: unless-stopped
     networks:
       - traefik

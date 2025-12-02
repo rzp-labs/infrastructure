@@ -14,9 +14,8 @@ networks:
     external: true
 
 include:
-
-  # external stack
   - copyparty/docker-compose.yml
+  - docker-socket-proxy/docker-compose.yml
   - dockge/docker-compose.yml
   - dozzle/docker-compose.yml
   - fileflows/docker-compose.yml
@@ -34,10 +33,7 @@ include:
   - sabnzbd/docker-compose.yml
   - sonarr/docker-compose.yml
   - traefik/docker-compose.yml
-
-  # internal stacks
-  - docker-socket-proxy/docker-compose.yml
-  #- namer/docker-compose.yml
+  - namer/docker-compose.yml
   - stash/docker-compose.yml
   - stash-hub/docker-compose.yml
   - stash-vr/docker-compose.yml

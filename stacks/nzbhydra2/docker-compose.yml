@@ -3,6 +3,9 @@ services:
   nzbhydra2:
     image: lscr.io/linuxserver/nzbhydra2:latest
     container_name: nzbhydra2
+    depends_on:
+      sabnzbd:
+        condition: service_started
     restart: unless-stopped
     networks:
       - traefik
@@ -16,7 +19,8 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.nzbhydra2.entrypoints=websecure"
-      - "traefik.http.routers.nzbhydra2.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.nzbhydra2.middlewares=internal@file,secure-headers@file,nzbhydra2-headers"
+      - "traefik.http.middlewares.nzbhydra2-headers.headers.customrequestheaders.X-Forwarded-Port=443"
       - "traefik.http.routers.nzbhydra2.tls.certresolver=cloudflare"
       - "traefik.http.routers.nzbhydra2.rule=Host(`nzbhydra2.${DOMAIN}`)"
       - "traefik.http.services.nzbhydra2.loadbalancer.server.port=5076"

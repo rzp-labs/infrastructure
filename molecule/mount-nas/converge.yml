@@ -40,7 +40,6 @@
           - netcat-openbsd
         state: present
 
-
     - name: Start mock NFS listener
       ansible.builtin.shell: "nc -l -k -p 2049 &"
       async: 3600
@@ -66,7 +65,6 @@
         state: started
         enabled: true
 
-
       # Create mount point first if it doesn't exist (it should be created by the playbook, but we need it before restart)
       # Actually, the playbook creates it. But we need to do this *after* the playbook runs but *before* the handler restarts Docker?
       # No, the handler runs at the end.
@@ -76,7 +74,6 @@
       # But the mount point is created *inside* the playbook.
 
       # Alternative: Pre-create the mount point in the setup play and bind mount it there.
-
 
 - import_playbook: ../../playbooks/mount-nas.yml
   vars:
@@ -104,4 +101,3 @@
     - name: Verify mount is active
       ansible.builtin.command: mountpoint /mnt/nas/data
       changed_when: false
-
