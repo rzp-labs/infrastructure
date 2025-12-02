@@ -8,7 +8,7 @@ Infrastructure as Code for managing containerized services on a Debian VM in Pro
 - **Host**: Debian VM
 - **Container Runtime**: Docker + Docker Compose (standalone)
 - **Reverse Proxy**: Traefik v3 with Cloudflare DNS challenge for SSL
-- **Authentication**: Zitadel OIDC + oauth2-proxy (single sign-on gateway)
+- **Authentication**: None by default; Traefik is internal-only behind router firewall/VPN
 - **Security**: Docker Socket Proxy (restricted API access), network isolation
 - **Configuration Management**: Ansible with Molecule testing
 
@@ -102,7 +102,7 @@ For security, deploy the socket proxy first:
 make docker-deploy stack=docker-socket-proxy
 ```
 
-### 7. Configure Traefik and Authentication
+### 7. Configure Traefik
 
 SSH to the VM and create `/opt/stacks/traefik/.env`:
 
@@ -119,14 +119,9 @@ CF_DNS_API_TOKEN=your_cloudflare_dns_api_token
 CF_API_EMAIL=your_email@example.com
 DOMAIN=your-domain.com
 TZ=America/Phoenix
-
-# OAuth2 Proxy (authentication gateway)
-OAUTH2_PROXY_CLIENT_ID=<from-zitadel>
-OAUTH2_PROXY_CLIENT_SECRET=<from-zitadel>
-OAUTH2_PROXY_COOKIE_SECRET=<random-32-bytes>
 ```
 
-**Note**: OAuth credentials are created automatically by the bootstrap process. See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for complete authentication setup.
+Traefik now operates entirely inside the homelab network; no OAuth secrets are required. See [stacks/traefik/README.md](stacks/traefik/README.md) for details and [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for the historical Zitadel-based design.
 
 ### 8. Deploy Traefik
 
@@ -158,7 +153,7 @@ For fresh deployments, use the orchestrated bootstrap instead of manual steps:
 # Clean any existing deployment
 make docker-destroy-all   # Type "destroy" to confirm
 
-# Run orchestrated bootstrap (4 stages: foundation, OAuth, proxy, services)
+# Run orchestrated bootstrap (3 stages: foundation, services, health)
 make docker-bootstrap
 
 # Verify infrastructure health
@@ -166,10 +161,9 @@ make docker-health
 ```
 
 **What Bootstrap Does:**
-1. **Foundation Stage** - Deploy socket proxy, database, and Zitadel
-2. **OAuth Setup** - Create Traefik OAuth app in Zitadel automatically
-3. **Proxy Layer** - Deploy Traefik with valid OAuth credentials
-4. **Services** - Deploy remaining services (dockge, zitadel-login)
+1. **Foundation Stage** - Ensure core Docker networks exist and `docker-socket-proxy` is running
+2. **Services Stage** - Sync stacks and deploy Traefik plus application services
+3. **Health Check Stage** - Run a generic health check playbook over containers and networks
 
 **Bootstrap Benefits:**
 - ✅ Automated OAuth application creation via Zitadel API
@@ -322,9 +316,9 @@ make dev-format  # Auto-format YAML and shell scripts
 
 ## Architecture Notes
 
-- **Authentication**: All services protected via oauth2-proxy + Zitadel OIDC at `login.yourdomain.com`
-- **Network Isolation**: Zitadel and databases run on internal networks only
-- **Single Entry Point**: Only Traefik exposed externally (ports 80/443)
+- **Authentication**: None by default; access is limited to the internal homelab network (or VPN/tunnel)
+- **Network Isolation**: Databases and internal services run on non-public Docker networks
+- **Single Entry Point**: Traefik terminates TLS for internal clients; router ports 80/443 no longer need to be forwarded from the internet
 - **Stacks Location**: Deploy to `/opt/stacks/<stack-name>/` on the VM
 - **Environment Files**: `.env` files NOT synced - create on VM manually via SSH
 - **Security**: Docker socket access proxied through docker-socket-proxy for restricted API access

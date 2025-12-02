@@ -1,15 +1,21 @@
+---
 services:
   dozzle:
     image: amir20/dozzle:latest
     container_name: dozzle
     restart: unless-stopped
-    user: "99:100"
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
     networks:
       - traefik
       - socket-proxy
     volumes:
       - /opt/stacks/dozzle/config:/config
     environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
       - DOZZLE_BASE=/
       - DOZZLE_LEVEL=info
       - DOZZLE_AUTH_PROVIDER=none
@@ -20,8 +26,13 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.dozzle.entrypoints=websecure"
-      - "traefik.http.routers.dozzle.middlewares=chain-sso-internal@file"
+      - "traefik.http.routers.dozzle.middlewares=internal@file,secure-headers@file"
       - "traefik.http.routers.dozzle.tls.certresolver=cloudflare"
       - "traefik.http.routers.dozzle.rule=Host(`dozzle.${DOMAIN}`)"
       - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
 
+networks:
+  socket-proxy:
+    external: true
+  traefik:
+    external: true

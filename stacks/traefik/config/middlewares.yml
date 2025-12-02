@@ -1,15 +1,6 @@
+---
 http:
   middlewares:
-    # OAuth2 authentication middleware
-    oauth2-auth:
-      forwardAuth:
-        address: http://traefik-oauth2-proxy:4180/oauth2/auth
-        trustForwardHeader: true
-        authResponseHeaders:
-          - X-Auth-Request-User
-          - X-Auth-Request-Email
-          - X-Auth-Request-Access-Token
-
     # Security headers
     secure-headers:
       headers:
@@ -19,36 +10,9 @@ http:
         stsPreload: true
         stsSeconds: 31536000
 
-    # Redirect root path to Zitadel login UI
-    zitadel-root-redirect:
-      redirectRegex:
-        regex: "^https?://[^/]+/$"
-        replacement: "/ui/v2/login"
-        permanent: true
-
-    # Ensure any legacy /ui/login path is forwarded to the v2 login UI
-    zitadel-v2-redirect:
-      redirectRegex:
-        regex: "^https?://[^/]+/ui/login$"
-        replacement: "/ui/v2/login"
-        permanent: true
-
-    # Complete auth chain
-    auth-chain:
-      chain:
-        middlewares:
-          - oauth2-auth
-          - secure-headers
-
     # Internal network whitelist
     internal:
       ipWhiteList:
         sourceRange:
           - 10.0.0.0/24
-
-    # Internal + auth chain
-    chain-sso-internal:
-      chain:
-        middlewares:
-          - internal
-          - oauth2-auth
+          - 172.16.0.0/12

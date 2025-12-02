@@ -1,0 +1,103 @@
+---
+- name: Prepare environment
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    nas_export_path: "/tmp/nfs-mock"
+    nas_mount_point: "/mnt/nas/data"
+
+  tasks:
+    - name: Add host to docker group
+      ansible.builtin.add_host:
+        name: "{{ inventory_hostname }}"
+        groups: docker
+      changed_when: false
+
+    - name: Install systemd (required for unit files)
+      ansible.builtin.package:
+        name: systemd
+        state: present
+        update_cache: true
+
+    - name: Create mock NFS export directory
+      ansible.builtin.file:
+        path: "{{ nas_export_path }}"
+        state: directory
+        mode: "0777"
+
+    - name: Create mount point directory
+      ansible.builtin.file:
+        path: "/mnt/nas/data"
+        state: directory
+        mode: "0777" # Match export path mode to avoid idempotence issues when bound
+
+    - name: Ensure ping and netcat are installed
+      ansible.builtin.package:
+        name:
+          - iputils-ping
+          - netcat-openbsd
+        state: present
+
+    - name: Start mock NFS listener
+      ansible.builtin.shell: "nc -l -k -p 2049 &"
+      async: 3600
+      poll: 0
+      changed_when: false
+
+    - name: Create dummy docker service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker.service
+        content: |
+          [Unit]
+          Description=Dummy Docker Service
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/bin/true
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start dummy docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+      # Create mount point first if it doesn't exist (it should be created by the playbook, but we need it before restart)
+      # Actually, the playbook creates it. But we need to do this *after* the playbook runs but *before* the handler restarts Docker?
+      # No, the handler runs at the end.
+      # But wait, the playbook *fails* at the handler.
+      # So I can't add a task *after* the playbook import in the same play if the playbook fails.
+      # I need to do this *before* the handler runs.
+      # But the mount point is created *inside* the playbook.
+
+      # Alternative: Pre-create the mount point in the setup play and bind mount it there.
+
+- import_playbook: ../../playbooks/mount-nas.yml
+  vars:
+    nas_remote_host: "127.0.0.1"
+    nas_export_path: "/tmp/nfs-mock"
+    nas_mount_point: "/mnt/nas/data"
+    nas_verify_writable: false
+    # Use bind mount for testing to allow unit activation
+    nas_fstype: none
+    nas_mount_options:
+      - bind
+    nas_remote: "/tmp/nfs-mock"
+    nas_start_automount: false
+
+- name: Verification Play
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Manually start mount unit for verification
+      ansible.builtin.systemd:
+        name: mnt-nas-data.mount
+        state: started
+
+    - name: Verify mount is active
+      ansible.builtin.command: mountpoint /mnt/nas/data
+      changed_when: false

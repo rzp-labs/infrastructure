@@ -4,7 +4,11 @@ services:
     container_name: stash
     image: ghcr.io/feederbox826/stash-s6:hwaccel-develop
     restart: unless-stopped
-    user: "99:100"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9999/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - traefik
     devices:
@@ -22,25 +26,29 @@ services:
       # Optional: Migration paths (uncomment if migrating from old installations)
       # - /path/to/old/stashapp/config:/root/.stash  # For stashapp/stash migration
       # - /path/to/old/hotio/config:/config/.stash   # For hotio/stash migration
-
     environment:
-      TZ: ${TZ}
-      MIGRATE: "FALSE"
-      SKIP_NVIDIA_PATCH: "FALSE"
-      CUSTOM_CERT_PATH: /config/certs
-      # AVGID: "18"
-      # LIBVA_DRIVER_NAME_JELLYFIN: iHD
-      # LIBVA_DRIVER_NAME: iHD
-      STASH_METADATA: /metadata/
-      STASH_CACHE: /cache/
-      STASH_GENERATED: /generated/
-      STASH_STASH: /data/
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      - MIGRATE=FALSE
+      - SKIP_NVIDIA_PATCH=FALSE
+      - CUSTOM_CERT_PATH=/config/certs
+      # - AVGID=18
+      # - LIBVA_DRIVER_NAME_JELLYFIN=iHD
+      # - LIBVA_DRIVER_NAME=iHD
+      - STASH_METADATA=/metadata/
+      - STASH_CACHE=/cache/
+      - STASH_GENERATED=/generated/
+      - STASH_STASH=/data/
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.stash.entrypoints=websecure"
-      - "traefik.http.routers.stash.middlewares=chain-sso-internal@file"
+      - "traefik.http.routers.stash.middlewares=internal@file,secure-headers@file"
       - "traefik.http.routers.stash.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash.rule=Host(`stash.${DOMAIN}`)"
       - "traefik.http.services.stash.loadbalancer.server.port=9999"
 
+networks:
+  traefik:
+    external: true

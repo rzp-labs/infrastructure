@@ -1,25 +1,30 @@
+---
 services:
   lidarr:
     image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
+    depends_on:
+      prowlarr:
+        condition: service_started
     restart: unless-stopped
     networks:
-      - rzp-net
-    ports:
-      - 8686:8686
+      - traefik
     volumes:
-      - /mnt/user/appdata/lidarr:/config
-      - /mnt/user/downloads/02_processing:/music
-      - /mnt/user/downloads/01_incomplete:/downloads
+      - /opt/stacks/lidarr:/config
+      - /mnt/nas/downloads/02_processing:/music
+      - /mnt/nas/downloads/01_incomplete:/downloads
     environment:
-      - PUID=99
-      - PGID=100
-      - UMASK=022
+      - PUID=1000
+      - PGID=1000
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:8686]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/lidarr-logo.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.lidarr.entrypoints=websecure"
+      - "traefik.http.routers.lidarr.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.lidarr.tls.certresolver=cloudflare"
+      - "traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`)"
+      - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
 
 networks:
-  rzp-net:
+  traefik:
     external: true

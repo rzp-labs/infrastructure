@@ -4,67 +4,74 @@
   become: true
   gather_facts: true
 
+  vars:
+    docker_compose_version: "v2.24.6"
+    docker_compose_arch_map:
+      aarch64: linux-aarch64
+      arm64: linux-aarch64
+      x86_64: linux-x86_64
+    docker_compose_arch: "{{ docker_compose_arch_map.get(ansible_architecture, 'linux-x86_64') }}"
+    docker_compose_url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-{{ docker_compose_arch }}"
+
   tasks:
-    - name: Ensure /usr/local/bin exists
-      ansible.builtin.file:
-        path: /usr/local/bin
-        state: directory
-        mode: "0755"
+    - name: Determine infrastructure project root
+      ansible.builtin.set_fact:
+        infrastructure_root: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
 
-    - name: Install stub docker CLI for Molecule testing
+    - name: Create inventory for services test (Docker install)
       ansible.builtin.copy:
-        dest: /usr/local/bin/docker
-        mode: "0755"
+        dest: /tmp/services_inventory.yml
         content: |
-          #!/bin/bash
-          subcommand="$1"
-          shift || true
+          all:
+            children:
+              homelab:
+                hosts:
+                  molecule-infra:
+                    ansible_host: localhost
+                    ansible_port: 32222
+                    ansible_user: rzp-admin
+                    ansible_ssh_private_key_file: "{{ lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true) }}"
+                    ansible_python_interpreter: /usr/bin/python3
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+      run_once: true
 
-          # Normalize calls like: docker --host unix:///var/run/docker.sock version --format '<json template>'
-          if [ "$subcommand" = "--host" ]; then
-            shift || true  # skip host value
-            subcommand="$1"
-            shift || true
-          fi
+    - name: Provision Docker and Compose via docker-install playbook
+      ansible.builtin.shell: |
+        cd "{{ infrastructure_root }}"
+        ansible-playbook -i /tmp/services_inventory.yml \
+          playbooks/docker-install.yml
+      args:
+        executable: /bin/bash
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_CONFIG: "{{ infrastructure_root }}/ansible.cfg"
+        ANSIBLE_REMOTE_TMP: "/tmp/.ansible-tmp"
+      register: docker_install_result
+      changed_when: false
+      failed_when: docker_install_result.rc != 0
+      delegate_to: localhost
+      become: false
+      run_once: true
 
-          case "$subcommand" in
-            ps)
-              cat <<'JSON'
-          [{"Names":"docker-socket-proxy","name":"docker-socket-proxy","State":"running","Status":"running","Health":"healthy"}]
-          JSON
-              ;;
-            inspect)
-              # Simulate docker inspect returning a running container
-              echo "true"
-              ;;
-            network)
-              cat <<'JSON'
-          [{"Name":"stacks_socket-proxy"},{"Name":"stacks_traefik"},{"Name":"stacks_zitadel"}]
-          JSON
-              ;;
-            version|info)
-              # Always return minimal JSON so docker modules can parse version/info output
-              echo '{"Server":{"Version":"24.0.7"},"Client":{"Version":"24.0.7"}}'
-              ;;
-            compose)
-              if [ "$1" = "version" ]; then
-                echo "Docker Compose version v2.27.0"
-              fi
-              ;;
-            logs)
-              exit 0
-              ;;
-            *)
-              exit 0
-              ;;
-          esac
+    - name: Install base packages required for Molecule host
+      ansible.builtin.apt:
+        name:
+          - ansible
+          - docker.io
+          - python3-pip
+          - rsync
+          - git
+          - curl
+        state: present
+        update_cache: true
 
-    - name: Ensure stub docker CLI is preferred in PATH
-      ansible.builtin.lineinfile:
-        path: /etc/profile.d/molecule-path.sh
-        line: 'export PATH="/usr/local/bin:$PATH"'
-        create: true
-        mode: "0644"
+    - name: Ensure Docker service is enabled and running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
 
     - name: Install linting tools for verification
       ansible.builtin.pip:
@@ -126,10 +133,34 @@
         group: root
         mode: "0644"
 
-    - name: Create mock environment variables
-      ansible.builtin.set_fact:
-        test_domain: "test.local"
-        test_zitadel_domain: "auth.test.local"
+    - name: Copy ansible.cfg for services tests
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/ansible.cfg"
+        dest: /opt/infrastructure/ansible.cfg
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Adjust remote ansible.cfg collections path for Orbstack VM
+      ansible.builtin.lineinfile:
+        path: /opt/infrastructure/ansible.cfg
+        regexp: '^collections_paths\s*='
+        line: 'collections_paths       = ~/.ansible/collections:/usr/share/ansible/collections'
+
+    - name: Copy Ansible requirements file
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/requirements.yml"
+        dest: /opt/infrastructure/requirements.yml
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install Ansible collections required by infrastructure
+      ansible.builtin.command: >-
+        ansible-galaxy collection install -r /opt/infrastructure/requirements.yml --force
+      args:
+        creates: /root/.ansible/collections/ansible_collections/community/docker
+      changed_when: true
 
     - name: Set environment variables for test
       ansible.builtin.lineinfile:
@@ -138,7 +169,52 @@
         state: present
       loop:
         - "DOMAIN=test.local"
-        - "ZITADEL_PUBLIC_DOMAIN=auth.test.local"
         - "CLOUDFLARE_DNS_API_TOKEN=test-token"
         - "ACME_EMAIL=test@test.local"
         - "TZ=UTC"
+        - "DOCKER_USER=1000:1000"
+
+    - name: Ensure rzp-admin user exists for Ansible parity
+      ansible.builtin.user:
+        name: rzp-admin
+        shell: /bin/bash
+        groups: sudo
+        append: true
+        create_home: true
+        state: present
+
+    - name: Allow rzp-admin passwordless sudo
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/99-rzp-admin
+        content: "rzp-admin ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+
+    - name: Ensure rzp-admin SSH directory exists
+      ansible.builtin.file:
+        path: /home/rzp-admin/.ssh
+        state: directory
+        owner: rzp-admin
+        group: rzp-admin
+        mode: "0700"
+
+    - name: Load Orbstack public key for rzp-admin access
+      ansible.builtin.set_fact:
+        admin_authorized_key: "{{ lookup('file', (lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true)) + '.pub') }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Install rzp-admin authorized_keys
+      ansible.builtin.copy:
+        content: "{{ admin_authorized_key | default('') }}"
+        dest: /home/rzp-admin/.ssh/authorized_keys
+        owner: rzp-admin
+        group: rzp-admin
+        mode: "0600"
+      when: admin_authorized_key is defined and admin_authorized_key | length > 0
+
+    - name: Ensure traefik network exists
+      community.docker.docker_network:
+        name: traefik
+        state: present

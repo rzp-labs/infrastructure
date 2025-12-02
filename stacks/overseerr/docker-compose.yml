@@ -1,24 +1,27 @@
+---
 services:
   overseerr:
     image: sctx/overseerr:latest
     container_name: overseerr
     restart: unless-stopped
     networks:
-      - rzp-net
-    ports:
-      - 5055:5055
+      - traefik
     volumes:
-      - /mnt/user/appdata/overseerr:/app/config
+      - /opt/stacks/overseerr:/app/config
     environment:
+      - PUID=1000
+      - PGID=1000
       - LOG_LEVEL=info
-      - UMASK=000
-      - PUID=99
-      - PGID=100
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:5055]/
-      - net.unraid.docker.icon=https://raw.githubusercontent.com/diamkil/docker-templates/master/diamkil/images/os_logo_square.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.overseerr.tls=true"
+      - "traefik.http.routers.overseerr.entrypoints=websecure"
+      - "traefik.http.routers.overseerr.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.overseerr.tls.certresolver=cloudflare"
+      - "traefik.http.routers.overseerr.rule=Host(`overseerr.${DOMAIN}`)"
+      - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
 
 networks:
-  rzp-net:
+  traefik:
     external: true

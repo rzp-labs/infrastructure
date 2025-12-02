@@ -1,7 +1,4 @@
 ---
-# Molecule scenario for testing Zitadel app configuration playbook
-# Focused on zitadel-configure-apps.yml behavior and env file updates
-
 dependency:
   name: galaxy
   options:
@@ -14,12 +11,11 @@ platforms:
   - name: instance
     image: geerlingguy/docker-debian13-ansible:latest
     pre_build_image: true
-    privileged: true
+    privileged: true  # Required for systemd and mount operations
     capabilities:
-      - ALL
+      - SYS_ADMIN
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - /var/run/docker.sock:/var/run/docker.sock
     cgroupns_mode: host
     command: /lib/systemd/systemd
     tmpfs:
@@ -42,7 +38,6 @@ provisioner:
       instance:
         ansible_user: root
   playbooks:
-    prepare: prepare.yml
     converge: converge.yml
     verify: verify.yml
   lint: |
@@ -54,7 +49,7 @@ verifier:
   name: ansible
 
 scenario:
-  name: zitadel-configure
+  name: mount-nas
   test_sequence:
     - dependency
     - cleanup
@@ -64,6 +59,7 @@ scenario:
     - prepare
     - converge
     - idempotence
+    - side_effect
     - verify
     - cleanup
     - destroy

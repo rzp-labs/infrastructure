@@ -8,25 +8,18 @@ dependency:
     requirements-file: requirements.yml
 
 driver:
-  name: docker
+  name: default
+  options:
+    managed: false
 
 platforms:
-  - name: instance
-    image: geerlingguy/docker-debian13-ansible:latest
-    pre_build_image: true
-    privileged: true
-    capabilities:
-      - ALL
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - /var/run/docker.sock:/var/run/docker.sock
-    cgroupns_mode: host
-    command: /lib/systemd/systemd
-    tmpfs:
-      - /run
-      - /tmp
-    networks:
-      - name: molecule-test-network
+  - name: molecule-infra
+    address: localhost
+    user: default
+    port: 32222
+    identity_file: "{{ lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true) }}"
+    groups:
+      - services_targets
 
 provisioner:
   name: ansible
@@ -39,8 +32,12 @@ provisioner:
       pipelining: true
   inventory:
     host_vars:
-      instance:
-        ansible_user: root
+      molecule-infra:
+        ansible_host: localhost
+        ansible_port: 32222
+        ansible_user: default
+        ansible_ssh_private_key_file: "{{ lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true) }}"
+        ansible_python_interpreter: /usr/bin/python3
   playbooks:
     prepare: prepare.yml
     converge: converge.yml
@@ -57,13 +54,8 @@ scenario:
   name: services
   test_sequence:
     - dependency
-    - cleanup
-    - destroy
     - syntax
-    - create
     - prepare
     - converge
     - idempotence
     - verify
-    - cleanup
-    - destroy

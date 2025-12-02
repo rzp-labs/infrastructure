@@ -1,25 +1,22 @@
+---
 services:
   whisparr:
     image: ghcr.io/hotio/whisparr:v3
     container_name: whisparr
+    depends_on:
+      prowlarr:
+        condition: service_started
     restart: unless-stopped
-    hostname: whisparr.internal
-    cap_add:
-      - NET_ADMIN
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv6.conf.all.disable_ipv6=1
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 6969:6969
     volumes:
-      - /mnt/user/appdata/whisparr:/config
-      - /mnt/user/data:/data
+      - /opt/stacks/whisparr:/config
+      - /mnt/nas/data:/data
     environment:
-      - PUID=99
-      - PGID=100
-      - UMASK=0002
+      - PUID=1000
+      - PGID=1000
       - PRIVOXY_ENABLED=false
       - UNBOUND_ENABLED=false
       - VPN_ENABLED=false
@@ -31,10 +28,14 @@ services:
       - VPN_PIA_DIP_TOKEN=no
       - VPN_PIA_PORT_FORWARD_PERSIST=false
     labels:
-      - net.unraid.docker.managed=dockge
-      - net.unraid.docker.webui=http://[IP]:[PORT:6969]/
-      - net.unraid.docker.icon=https://hotio.dev/webhook-avatars/whisparr.png
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.whisparr.entrypoints=websecure"
+      - "traefik.http.routers.whisparr.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.whisparr.tls.certresolver=cloudflare"
+      - "traefik.http.routers.whisparr.rule=Host(`whisparr.${DOMAIN}`)"
+      - "traefik.http.services.whisparr.loadbalancer.server.port=6969"
 
 networks:
-  rzp-net:
+  traefik:
     external: true

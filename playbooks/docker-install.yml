@@ -9,7 +9,7 @@
     docker_install_compose: true
     docker_compose_version: "v2.32.1"
     docker_users:
-      - "{{ ansible_user | default('admin') }}"
+      - "{{ ansible_user | default('rzp-admin') }}"
 
   pre_tasks:
     - name: Install prerequisites

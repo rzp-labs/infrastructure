@@ -7,7 +7,12 @@
   tasks:
     - name: Determine infrastructure project root
       ansible.builtin.set_fact:
-        infrastructure_root: "/opt/infrastructure"
+        infrastructure_root: >-
+          {{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY')
+             | default(playbook_dir | dirname | dirname, true) }}
+      delegate_to: localhost
+      become: false
+      run_once: true
 
     - name: Show infrastructure project root
       ansible.builtin.debug:
@@ -21,55 +26,73 @@
             children:
               homelab:
                 hosts:
-                  localhost:
-                    ansible_connection: local
+                  molecule-infra:
                     ansible_host: localhost
-                    ansible_python_interpreter: "{{ ansible_python.executable }}"
+                    ansible_port: 32222
+                    ansible_user: rzp-admin
+                    ansible_ssh_private_key_file: "{{ lookup('env', 'ORBSTACK_SSH_KEY') | default('~/.orbstack/ssh/id_ed25519', true) }}"
+                    ansible_python_interpreter: /usr/bin/python3
         mode: '0644'
+      delegate_to: localhost
+      become: false
+      run_once: true
 
-    - name: Run staged bootstrap deploy playbook (prerequisite)
+    - name: Run foundation bootstrap (socket proxy only) for test host
       ansible.builtin.shell: |
-        cd /tmp
-        ansible-playbook -i services_inventory.yml \
-          -e docker_skip_compose=true \
-          "{{ infrastructure_root }}/playbooks/docker-deploy-bootstrap.yml"
+        cd "{{ infrastructure_root }}"
+        ansible-playbook -i /tmp/services_inventory.yml \
+          playbooks/docker-bootstrap-foundation.yml
       args:
         executable: /bin/bash
       environment:
         ANSIBLE_HOST_KEY_CHECKING: "False"
-      register: services_bootstrap
+        ANSIBLE_CONFIG: "{{ infrastructure_root }}/ansible.cfg"
+        ANSIBLE_REMOTE_TMP: "/tmp/.ansible-tmp"
+      register: foundation_bootstrap
       changed_when: false
-      failed_when: services_bootstrap.rc != 0
+      failed_when: foundation_bootstrap.rc != 0
+      delegate_to: localhost
+      become: false
+      run_once: true
 
     - name: Run staged services deploy playbook
       ansible.builtin.shell: |
-        cd /tmp
-        ansible-playbook -i services_inventory.yml \
-          -e docker_skip_compose=true \
-          "{{ infrastructure_root }}/playbooks/docker-deploy-services.yml"
+        cd "{{ infrastructure_root }}"
+        ansible-playbook -i /tmp/services_inventory.yml \
+          -e services_allow_fake_dri=true \
+          playbooks/docker-deploy-services.yml
       args:
         executable: /bin/bash
       environment:
         ANSIBLE_HOST_KEY_CHECKING: "False"
+        ANSIBLE_CONFIG: "{{ infrastructure_root }}/ansible.cfg"
+        ANSIBLE_REMOTE_TMP: "/tmp/.ansible-tmp"
       register: services_deploy
       changed_when: false
       failed_when: services_deploy.rc != 0
+      delegate_to: localhost
+      become: false
+      run_once: true
 
     - name: Run services health check playbook
       ansible.builtin.shell: |
-        cd /tmp
-        ansible-playbook -i services_inventory.yml \
+        cd "{{ infrastructure_root }}"
+        ansible-playbook -i /tmp/services_inventory.yml \
           -e skip_oauth_health=true \
-          "{{ infrastructure_root }}/playbooks/docker-check-health.yml"
+          playbooks/docker-check-health.yml
       args:
         executable: /bin/bash
       environment:
         ANSIBLE_HOST_KEY_CHECKING: "False"
         DOMAIN: "test.local"
-        ZITADEL_PUBLIC_DOMAIN: "auth.test.local"
+        ANSIBLE_CONFIG: "{{ infrastructure_root }}/ansible.cfg"
+        ANSIBLE_REMOTE_TMP: "/tmp/.ansible-tmp"
       register: services_health
       changed_when: false
       failed_when: services_health.rc != 0
+      delegate_to: localhost
+      become: false
+      run_once: true
 
     - name: Display services health result
       ansible.builtin.debug:

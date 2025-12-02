@@ -32,7 +32,7 @@
         project_src: "{{ stacks_dir }}"
         state: absent
         remove_orphans: true
-        networks: socket-proxy
+
       when: root_compose.stat.exists
 
     - name: Discover stack directories when root orchestrator missing

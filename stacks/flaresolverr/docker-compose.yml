@@ -4,17 +4,25 @@ services:
     image: flaresolverr/flaresolverr:latest
     container_name: flaresolverr
     restart: unless-stopped
+    shm_size: 2g
+    dns:
+      - 10.0.0.1
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
     networks:
       - traefik
     environment:
       - LOG_LEVEL=info
-      - TZ=UTC
+      - TZ=${TZ}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.flaresolverr.entrypoints=websecure"
-      - "traefik.http.routers.flaresolverr.middlewares=chain-sso-internal@file"
+      - "traefik.http.routers.flaresolverr.middlewares=internal@file,secure-headers@file"
       - "traefik.http.routers.flaresolverr.tls.certresolver=cloudflare"
       - "traefik.http.routers.flaresolverr.rule=Host(`flaresolverr.${DOMAIN}`)"
       - "traefik.http.services.flaresolverr.loadbalancer.server.port=8191"
 
+networks:
+  traefik:
+    external: true

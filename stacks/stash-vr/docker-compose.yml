@@ -3,36 +3,44 @@ services:
   stash-vr:
     image: ofl0w/stash-vr:latest
     container_name: stash-vr
+    depends_on:
+      stash:
+        condition: service_healthy
     restart: unless-stopped
-    user: "99:100"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - STASH_GRAPHQL_URL=${STASH_GRAPHQL_URL}
+      - STASH_API_KEY=${STASH_API_KEY}
+      # - FAVORITE_TAG="FAVORITE"
+
+      ## FILTERS can be either 'frontpage' or a comma separated list of filter ids.
+      ## If left empty all saved filters will be shown.
+      # - FILTERS="2,3,7"     # comma separated list of filter ids to show
+      # - FILTERS="frontpage" # show only scene filters from front page
+
+      - ALLOW_SYNC_MARKERS=true
+      # - HEATMAP_HEIGHT_PX=45
+      - DISABLE_PLAY_COUNT=true
+      # - EVENT_SERVER_URL="http://192.168.0.127:8099"
+
+      # - LOG_LEVEL="debug"
+      # - DISABLE_LOG_COLOR="true"
+
+      # - FORCE_HTTPS=true
     networks:
       - traefik
     ports:
       - 9666:9666
-    environment:
-      STASH_GRAPHQL_URL: ${STASH_GRAPHQL_URL}
-      STASH_API_KEY: ${STASH_API_KEY}
-      #FAVORITE_TAG: "FAVORITE"
-
-      ## FILTERS can be either 'frontpage' or a comma separated list of filter ids.
-      ## If left empty all saved filters will be shown.
-      #FILTERS: "2,3,7"     # comma separated list of filter ids to show
-      #FILTERS: "frontpage" # show only scene filters from front page
-
-      ALLOW_SYNC_MARKERS: "true"
-      #HEATMAP_HEIGHT_PX: 45
-      DISABLE_PLAY_COUNT: "true"
-      #EVENT_SERVER_URL: "http://192.168.0.127:8099":"
-
-      #LOG_LEVEL: "debug"
-      #DISABLE_LOG_COLOR: "true"
-
-      #FORCE_HTTPS: "true"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.stash-vr.entrypoints=websecure"
-      - "traefik.http.routers.stash-vr.middlewares=chain-sso-internal@file"
+      - "traefik.http.routers.stash-vr.middlewares=internal@file,secure-headers@file"
       - "traefik.http.routers.stash-vr.tls.certresolver=cloudflare"
       - "traefik.http.routers.stash-vr.rule=Host(`vr.${DOMAIN}`)"
       - "traefik.http.services.stash-vr.loadbalancer.server.port=9666"
+
+networks:
+  traefik:
+    external: true

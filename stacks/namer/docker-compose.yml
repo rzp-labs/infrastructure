@@ -1,30 +1,38 @@
+---
 services:
   namer-sdb:
     image: ghcr.io/rzp-labs/namer:latest
     container_name: namer-sdb
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 6980:6980
     devices:
       - /dev/dri:/dev/dri # Map all DRM devices (supports iGPU + Arc)
     group_add:
-      - "18" # video group for GPU access
+      - "44" # video group for GPU access
     volumes:
-      - /mnt/user/appdata/namer-sdb/config:/app/config
-      - /mnt/user/appdata/namer-sdb/database:/app/database
-      - /mnt/user/appdata/namer-sdb/logs:/app/logs
-      - /mnt/user/data/media/namer-sdb:/app/media
+      - /opt/stacks/namer-sdb/config:/app/config
+      - /opt/stacks/namer-sdb/database:/app/database
+      - /opt/stacks/namer-sdb/logs:/app/logs
+      - /mnt/nas/data/media/namer-sdb:/app/media
     environment:
+      - PUID=1000
+      - PGID=1000
       - NAMER_CONFIG=/app/config/namer-sdb.cfg
       - TZ=${TZ}
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - UMASK=${UMASK}
       - LIBVA_DRIVER_NAME=iHD
       - TPDB_TOKEN=${TPDB_TOKEN}
       - STASHDB_TOKEN=${STASHDB_TOKEN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.namer.entrypoints=websecure"
+      - "traefik.http.routers.namer.middlewares=internal@file,secure-headers@file"
+      - "traefik.http.routers.namer.tls.certresolver=cloudflare"
+      - "traefik.http.routers.namer.rule=Host(`namer.${DOMAIN}`)"
+      - "traefik.http.services.namer.loadbalancer.server.port=6980"
     healthcheck:
       test:
         - CMD-SHELL
@@ -33,30 +41,30 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
   # TPDB instance
   namer-pdb:
     image: ghcr.io/rzp-labs/namer:latest
     container_name: namer-pdb
     restart: unless-stopped
     networks:
-      - rzp-net
+      - traefik
     ports:
       - 6981:6980
     devices:
       - /dev/dri:/dev/dri # Map all DRM devices (supports iGPU + Arc)
     group_add:
-      - "18" # video group for GPU access
+      - "44" # video group for GPU access
     volumes:
-      - /mnt/user/appdata/namer-pdb/config:/app/config
-      - /mnt/user/appdata/namer-pdb/database:/app/database
-      - /mnt/user/appdata/namer-pdb/logs:/app/logs
-      - /mnt/user/data/media/namer-pdb:/app/media
+      - /opt/stacks/namer-pdb/config:/app/config
+      - /opt/stacks/namer-pdb/database:/app/database
+      - /opt/stacks/namer-pdb/logs:/app/logs
+      - /mnt/nas/data/media/namer-pdb:/app/media
     environment:
+      - PUID=1000
+      - PGID=1000
       - NAMER_CONFIG=/app/config/namer-pdb.cfg
       - TZ=${TZ}
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - UMASK=${UMASK}
       - LIBVA_DRIVER_NAME=iHD
       - TPDB_TOKEN=${TPDB_TOKEN}
       - STASHDB_TOKEN=${STASHDB_TOKEN}
@@ -68,6 +76,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
 networks:
-  rzp-net:
+  traefik:
     external: true

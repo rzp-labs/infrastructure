@@ -8,7 +8,7 @@ MOLECULE_SCENARIOS := $(shell find molecule -mindepth 1 -maxdepth 1 -type d -exe
         docker-deploy docker-deploy-all docker-deploy-bootstrap docker-deploy-services \
         docker-bootstrap docker-stop-all docker-destroy-all \
         docker-install docker-health docker-check-auth docker-restart-all docker-doctor \
-        zitadel-configure \
+        zitadel-configure zitadel-reset \
         test-quick test-all test-molecule test-quality test-coverage test-ci \
         ssh-check ssh-setup ssh-test ssh-prime \
         dev-format dev-clean dev-clean-all \
@@ -27,9 +27,18 @@ help: ## Show this help message
 	@echo "=== Docker Stack Management (docker-*) ==="
 	@echo "  make docker-deploy stack=<name>  Deploy single stack"
 	@echo "  make docker-deploy-all           Deploy all stacks"
-	@echo "  make docker-bootstrap            Bootstrap infrastructure"
+	@echo "  make docker-bootstrap            Full bootstrap (foundation + OAuth + services)"
+	@echo "  make docker-deploy-bootstrap     Deploy bootstrap stage (socket proxy + Zitadel)"
+	@echo "  make docker-deploy-services      Deploy services stage (Traefik + apps)"
 	@echo "  make docker-stop-all             Stop all stacks"
 	@echo "  make docker-destroy-all          Destroy all stacks"
+	@echo "  make docker-health               Check infrastructure health"
+	@echo "  make docker-doctor               Prune unused Docker artifacts"
+	@echo ""
+	@echo "=== Zitadel / Auth (zitadel-*) ==="
+	@echo "  make zitadel-configure           Configure Zitadel OIDC applications"
+	@echo "  make zitadel-reset               Reset Zitadel (delete all data)"
+	@echo "  make docker-check-auth           Check Zitadel + OIDC health"
 	@echo ""
 	@echo "=== Testing (test-*) ==="
 	@echo "  make test-quick      Fast tests (<5s)"
@@ -143,11 +152,6 @@ docker-doctor: ## Prune unused Docker artifacts on homelab host
 	uv run python scripts/update_known_hosts.py
 	scripts/ansible_exec.sh ansible-playbook playbooks/docker-doctor.yml
 
-docker-deploy-bootstrap: ## Deploy bootstrap stage (socket proxy + Zitadel)
-	@echo "Deploying bootstrap stage..."
-	uv run python scripts/update_known_hosts.py
-	scripts/ansible_exec.sh ansible-playbook playbooks/docker-deploy-bootstrap.yml
-
 docker-deploy-services: ## Deploy services stage (Traefik + dependents)
 	@echo "Deploying services stage..."
 	uv run python scripts/update_known_hosts.py
@@ -161,6 +165,11 @@ docker-check-auth: ## Check Zitadel + OIDC authentication health
 zitadel-configure: ## Configure Zitadel OIDC applications
 	uv run python scripts/update_known_hosts.py
 	scripts/ansible_exec.sh ansible-playbook playbooks/zitadel-configure-apps.yml
+
+zitadel-reset: ## Reset Zitadel instance (deletes all data, requires re-bootstrap)
+	@echo "Resetting Zitadel instance..."
+	uv run python scripts/update_known_hosts.py
+	scripts/ansible_exec.sh ansible-playbook playbooks/zitadel-reset.yml
 
 ##
 ## Testing (test-*)
@@ -215,7 +224,7 @@ ssh-setup: ## Run first-time SSH setup wizard
 
 .PHONY: ssh-test
 ssh-test: ## Run SSH diagnostics
-	@$(UV_RUN) ansible-playbook playbooks/ssh-diagnose.yml
+	@uv run ansible-playbook playbooks/ssh-diagnose.yml
 
 ssh-prime: ## Refresh repo-managed SSH host fingerprints from inventory
 	uv run python scripts/update_known_hosts.py

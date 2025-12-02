@@ -10,20 +10,25 @@
     required_networks:
       - traefik
       - socket-proxy
-    bootstrap_containers:
-      - docker-socket-proxy
-      - zitadel-db
-      - zitadel
-      - zitadel-login
     services_containers:
       - traefik
-      - traefik-oauth2-proxy
+      - sabnzbd
+      - stash
+      - stash-hub
 
   tasks:
-    - name: Ensure rsync is available on remote host
-      ansible.builtin.package:
-        name: rsync
-        state: present
+    - name: Load GHCR credentials from .env
+      ansible.builtin.set_fact:
+        ghcr_user: "{{ ghcr_user | default(lookup('ini', 'GHCR_USER', type='properties', file=playbook_dir + '/../stacks/.env'), true) }}"
+        ghcr_pat: "{{ ghcr_pat | default(lookup('ini', 'GHCR_PAT', type='properties', file=playbook_dir + '/../stacks/.env'), true) }}"
+
+    - name: Debug GHCR credentials
+      ansible.builtin.debug:
+        msg:
+          - "Playbook dir: {{ playbook_dir }}"
+          - "Env file path: {{ playbook_dir + '/../stacks/.env' }}"
+          - "GHCR User: {{ ghcr_user }}"
+          - "GHCR PAT length: {{ ghcr_pat | length }}"
 
     - name: Ensure stacks directory exists on remote host
       ansible.builtin.file:
@@ -32,25 +37,26 @@
         mode: "0755"
 
     - name: Sync stacks directory (including services orchestrator) to remote host
-      ansible.posix.synchronize:
+      ansible.builtin.copy:
         src: "{{ stacks_src_dir }}/"
-        dest: "{{ stacks_dest_dir }}"
-        delete: false
-        recursive: true
-        rsync_opts:
-          - "--perms"
-          - "--times"
-          - "--omit-dir-times"
-        use_ssh_args: true
-        rsync_path: "sudo rsync"
-      delegate_to: localhost
-      become: false
+        dest: "{{ stacks_dest_dir }}/"
+        owner: "0"
+        group: "0"
+        mode: preserve
+      # Uses normal SSH + sudo from play (become: true)
 
     - name: Ensure shared networks exist for services stage
       community.docker.docker_network:
         name: "{{ item }}"
         state: present
       loop: "{{ required_networks }}"
+
+    - name: Log in to GHCR for private images
+      community.docker.docker_login:
+        registry_url: ghcr.io
+        username: "{{ ghcr_user }}"
+        password: "{{ ghcr_pat }}"
+      when: ghcr_user is defined and ghcr_pat is defined
 
     - name: Ensure Traefik ACME file exists with secure permissions
       ansible.builtin.file:
@@ -60,73 +66,44 @@
         group: "0"
         mode: "0600"
 
-    - name: OAuth setup | Ensure root environment file exists
+
+    - name: Ensure service config directories are writable by app user
       ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/.env"
-        state: touch
-        mode: "0600"
-
-    - name: OAuth setup | Read existing root environment file
-      ansible.builtin.slurp:
-        path: "{{ stacks_dest_dir }}/.env"
-      register: traefik_env_slurp
-      failed_when: false
-      when: not (ansible_check_mode | default(false))
-
-    - name: OAuth setup | Extract existing cookie secret line
-      ansible.builtin.set_fact:
-        traefik_env_content: "{{ (traefik_env_slurp.content | default('')) | b64decode | default('') }}"
-        existing_cookie_line: "{{ traefik_env_content | regex_search('^OAUTH2_PROXY_COOKIE_SECRET=.*$', multiline=True) | default('') }}"
-      when: traefik_env_slurp is defined and traefik_env_slurp.content is defined
-
-    - name: OAuth setup | Extract cookie secret value
-      ansible.builtin.set_fact:
-        current_cookie_secret: "{{ (existing_cookie_line | default('')) | regex_replace('^OAUTH2_PROXY_COOKIE_SECRET=', '') }}"
-      when: existing_cookie_line is defined
-
-    - name: OAuth setup | Generate OAuth2 cookie secret when missing
-      ansible.builtin.command: >-
-        python3 -c 'import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
-      register: cookie_secret_gen
-      changed_when: true
-      when: (current_cookie_secret | default('')) | length == 0
-
-    - name: OAuth setup | Select OAuth2 cookie secret value
-      ansible.builtin.set_fact:
-        oauth2_proxy_cookie_secret: "{{ current_cookie_secret if (current_cookie_secret | default('') | length > 0) else cookie_secret_gen.stdout }}"
-
-    - name: OAuth setup | Ensure OAuth2 cookie secret is present in root .env
-      ansible.builtin.lineinfile:
-        path: "{{ stacks_dest_dir }}/.env"
-        regexp: '^OAUTH2_PROXY_COOKIE_SECRET='
-        line: "OAUTH2_PROXY_COOKIE_SECRET={{ oauth2_proxy_cookie_secret }}"
-        create: true
-        mode: "0600"
-
-    - name: Ensure Dozzle config directory is writable by app user
-      ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/dozzle/config"
+        path: "{{ stacks_dest_dir }}/{{ item }}"
         state: directory
-        owner: "99"
-        group: "100"
+        owner: "{{ puid }}"
+        group: "{{ pgid }}"
         mode: "0755"
-        recurse: true
-
-    - name: Ensure Sonarr config directory is writable by app user
-      ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/sonarr"
-        state: directory
-        owner: "99"
-        group: "100"
-        mode: "0755"
-        recurse: true
+        recurse: false
+      loop:
+        - dozzle/config
+        - sonarr
+        - prowlarr
+        - radarr
+        - sabnzbd
+        - nzbhydra2
+        - whisparr
+        - lidarr
+        - fileflows/data
+        - fileflows/logs
+        - fileflows/tmp
+        - copyparty/config
+        - namer-sdb/config
+        - namer-sdb/database
+        - namer-sdb/logs
+        - namer-pdb/config
+        - namer-pdb/database
+        - namer-pdb/logs
+        - overseerr
+        - profilarr
+        - jdownloader2
 
     - name: Ensure Stash directories are writable by app user
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
-        owner: "99"
-        group: "100"
+        owner: "{{ puid }}"
+        group: "{{ pgid }}"
         mode: "0755"
         recurse: true
       loop:
@@ -136,33 +113,83 @@
         - "{{ stacks_dest_dir }}/stash/cache"
         - "{{ stacks_dest_dir }}/stash/generated"
 
-    - name: Ensure Stash Hub data directory is writable by app user
+    - name: Ensure Stash Hub directories are writable by app user
       ansible.builtin.file:
-        path: "{{ stacks_dest_dir }}/stash-hub/data"
+        path: "{{ item }}"
         state: directory
-        owner: "99"
-        group: "100"
+        owner: "{{ puid }}"
+        group: "{{ pgid }}"
         mode: "0755"
         recurse: true
+      loop:
+        - "{{ stacks_dest_dir }}/stash-hub/data"
+        - "{{ stacks_dest_dir }}/stash-hub/logs"
+        - "{{ stacks_dest_dir }}/stash-hub/backend_data"
+        - "{{ stacks_dest_dir }}/stash-hub/stream_endpoints"
+        - "{{ stacks_dest_dir }}/stash-hub/db"
 
-    - name: Assert bootstrap containers are healthy before deploying services
-      ansible.builtin.command: >-
-        docker inspect -f '{% raw %}{{ .State.Running }}{% endraw %}' {{ item }}
-      register: bootstrap_status
-      changed_when: false
-      failed_when: bootstrap_status.rc != 0 or (bootstrap_status.stdout | trim) != 'true'
-      loop: "{{ bootstrap_containers }}"
-      when: not (ansible_check_mode | default(false))
+    - name: Write Molecule services orchestrator without stash stack
+      ansible.builtin.copy:
+        dest: "{{ stacks_dest_dir }}/docker-compose.services.molecule.yml"
+        content: |
+          networks:
+            traefik:
+              external: true
+            socket-proxy:
+              external: true
 
-    - name: Deploy services compose project (root-level orchestrator)
-      community.docker.docker_compose_v2:
-        project_src: "{{ stacks_dest_dir }}"
-        project_name: services
-        files:
-          - docker-compose.services.yml
-        state: present
-        pull: always
+          include:
+            - dozzle/docker-compose.yml
+            - fileflows/docker-compose.yml
+            - flaresolverr/docker-compose.yml
+            - jdownloader2/docker-compose.yml
+            - lidarr/docker-compose.yml
+            - netdata/docker-compose.yml
+            - nzbhydra2/docker-compose.yml
+            - overseerr/docker-compose.yml
+            - plex-media-server/docker-compose.yml
+            - profilarr/docker-compose.yml
+            - radarr/docker-compose.yml
+            - sabnzbd/docker-compose.yml
+            - sonarr/docker-compose.yml
+            - traefik/docker-compose.yml
+            - whisparr/docker-compose.yml
+        mode: "0644"
       when:
+        - services_allow_fake_dri | default(false) | bool
+        - not (ansible_check_mode | default(false))
+
+    - name: Load Stash Hub image from tarball
+      community.docker.docker_image_load:
+        path: /home/rzp-admin/the-stash-hub-latest.tar
+      when:
+        - not (ansible_check_mode | default(false))
+
+    - name: Deploy services compose project (root orchestrator, full GPU)
+      ansible.builtin.shell: |
+        cd "{{ stacks_dest_dir }}"
+        docker-compose -f docker-compose.yml up -d --remove-orphans
+      args:
+        executable: /bin/bash
+      register: services_compose
+      changed_when: services_compose.rc == 0
+      failed_when: services_compose.rc != 0
+      when:
+        - not (services_allow_fake_dri | default(false) | bool)
+        - not (docker_skip_compose | default(false))
+        - not (ansible_check_mode | default(false))
+
+    - name: Deploy services compose project for Molecule (stash excluded)
+      ansible.builtin.shell: |
+        cd "{{ stacks_dest_dir }}"
+        docker-compose -f docker-compose.services.molecule.yml up -d --remove-orphans
+      args:
+        executable: /bin/bash
+      register: services_compose_molecule
+      changed_when: services_compose_molecule.rc == 0
+      failed_when: services_compose_molecule.rc != 0
+      when:
+        - services_allow_fake_dri | default(false) | bool
         - not (docker_skip_compose | default(false))
         - not (ansible_check_mode | default(false))
 
@@ -175,21 +202,91 @@
       retries: 30
       delay: 5
       loop: "{{ services_containers }}"
-      when: not (ansible_check_mode | default(false))
-
-    - name: Optionally verify OIDC discovery
-      ansible.builtin.uri:
-        url: "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}/.well-known/openid-configuration"
-        method: GET
-        validate_certs: false
-        status_code: 200
-      register: oidc_ping
-      retries: 5
-      delay: 2
-      until: oidc_ping is succeeded
-      ignore_errors: true
-      when: not (ansible_check_mode | default(false))
+      when:
+        - not (ansible_check_mode | default(false))
+        - not (docker_skip_compose | default(false))
 
     - name: Report services deployment result
       ansible.builtin.debug:
         msg: "Services stacks deployed successfully"
+
+    - name: Configure SABnzbd to suppress warnings and handle illegal characters
+      block:
+        - name: Wait for SABnzbd config file to be generated
+          ansible.builtin.wait_for:
+            path: "{{ stacks_dest_dir }}/sabnzbd/sabnzbd.ini"
+            state: present
+            timeout: 300
+
+        - name: Disable helpful_warnings in sabnzbd.ini
+          ansible.builtin.lineinfile:
+            path: "{{ stacks_dest_dir }}/sabnzbd/sabnzbd.ini"
+            regexp: '^helpful_warnings ='
+            line: 'helpful_warnings = 0'
+          register: sabnzbd_warnings
+
+        - name: Enable replace_illegal in sabnzbd.ini
+          ansible.builtin.lineinfile:
+            path: "{{ stacks_dest_dir }}/sabnzbd/sabnzbd.ini"
+            regexp: '^replace_illegal ='
+            line: 'replace_illegal = 1'
+            insertafter: '\[misc\]'
+          register: sabnzbd_illegal
+
+        - name: Restart SABnzbd to apply config changes
+          community.docker.docker_container:
+            name: sabnzbd
+            state: started
+            restart: true
+          when: sabnzbd_warnings.changed or sabnzbd_illegal.changed
+      when:
+        - "'sabnzbd' in services_containers"
+        - not (ansible_check_mode | default(false))
+
+    - name: Configure Stash-Hub connectivity
+      block:
+        - name: Wait for Stash config file to be generated
+          ansible.builtin.wait_for:
+            path: "{{ stacks_dest_dir }}/stash/config/config.yml"
+            state: present
+            timeout: 300
+
+        - name: Read Stash config file
+          ansible.builtin.slurp:
+            src: "{{ stacks_dest_dir }}/stash/config/config.yml"
+          register: stash_config_file
+
+        - name: Extract Stash API key
+          ansible.builtin.set_fact:
+            stash_api_key: "{{ (stash_config_file['content'] | b64decode | from_yaml).api_key }}"
+
+        - name: Update Stash-Hub database configuration
+          ansible.builtin.shell: |
+            docker exec stash-hub python3 -c "
+            import sqlite3
+            conn = sqlite3.connect('/app/data/main.db')
+            cursor = conn.cursor()
+            cursor.execute('SELECT endpoint, api_key FROM stash_config WHERE id=1')
+            row = cursor.fetchone()
+            if row and (row[0] != 'stash' or row[1] != '{{ stash_api_key }}'):
+                cursor.execute('UPDATE stash_config SET endpoint = ?, api_key = ? WHERE id = 1', ('stash', '{{ stash_api_key }}'))
+                conn.commit()
+                print('changed')
+            conn.close()
+            "
+          register: stash_hub_db_update
+          changed_when: "'changed' in stash_hub_db_update.stdout"
+
+        - name: Restart Stash-Hub to apply config changes
+          community.docker.docker_container:
+            name: stash-hub
+            state: started
+            restart: true
+          when: stash_hub_db_update.changed
+
+      when:
+        - "'stash' in services_containers"
+        - "'stash-hub' in services_containers"
+        - not (ansible_check_mode | default(false))
+
+

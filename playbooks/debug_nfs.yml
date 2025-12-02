@@ -1,0 +1,23 @@
+- hosts: debian-docker
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Get mount info
+      shell: cat /proc/mounts | grep nfs
+      register: mount_info
+      ignore_errors: true
+
+    - name: Get dmesg
+      shell: dmesg | tail -n 20
+      register: dmesg_info
+
+    - name: Get service status
+      shell: systemctl status mnt-nas-data.mount docker.service --no-pager
+      register: service_status
+      ignore_errors: true
+
+    - debug:
+        msg:
+          - "Mounts: {{ mount_info.stdout_lines }}"
+          - "Services: {{ service_status.stdout_lines }}"
+          - "Dmesg: {{ dmesg_info.stdout_lines }}"

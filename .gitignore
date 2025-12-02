@@ -132,5 +132,8 @@ local.json
 *-local.*
 
 
-#Ignore windsurf AI rules
+# Ignore windsurf AI rules
 .windsurfrules
+
+# Claude AI sessions
+.claude/sessions

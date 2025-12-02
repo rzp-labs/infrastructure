@@ -42,34 +42,26 @@
           - "✓ Python is installed: {{ python_version.stdout }}"
 
     # === SECURITY TEST DOCUMENTATION ===
-    # The following security tests are documented here for implementation in actual deployments.
-    # Molecule tests verify Ansible playbook syntax and basic infrastructure, not runtime security.
+    # Molecule validates syntax only. Production deployments should still perform
+    # runtime security checks after Ansible completes:
     #
-    # CRITICAL SECURITY TESTS (to be implemented in deployment verification):
+    # 1. Router ingress closed
+    #    - Confirm WAN-facing firewall blocks ports 80/443 entirely
+    #    - Example: run external nmap; expect ports filtered/closed
     #
-    # 1. Zitadel External Access Verification
-    #    - Verify Zitadel is NOT accessible from external network
-    #    - Test: wait_for host={{ ansible_default_ipv4.address }} port=8080 state=stopped timeout=3
-    #    - Expected: Connection timeout (port closed externally)
-    #    - Risk: Authentication secrets exposed if accessible
+    # 2. Traefik network isolation
+    #    - Inspect the `traefik` network and ensure only intended services join it
+    #    - Example: docker network inspect traefik --format '{{ '{{' }}len .Containers{{ '}}' }}'
     #
-    # 2. OAuth2-Proxy Health Endpoint
-    #    - Verify oauth2-proxy is responding to health checks
-    #    - Test: uri url=http://localhost:4180/ping status_code=200
-    #    - Expected: HTTP 200 response
-    #    - Risk: Authentication layer down without detection
+    # 3. Cloudflare token scope
+    #    - Verify the DNS API token grants Zone:DNS:Edit for the single zone only
+    #    - Example: review token permissions in Cloudflare dashboard/audit logs
     #
-    # 3. Internal Network Isolation
-    #    - Verify zitadel network is configured as internal-only
-    #    - Test: docker network inspect zitadel --format '{{.Internal}}'
-    #    - Expected: Output 'true'
-    #    - Risk: Unintended network access paths
-    #
-    # NOTE: These tests require actual service deployment and should be run as post-deployment
-    #       validation, not in Molecule's limited test container environment.
+    # These checks belong in operational runbooks since Molecule cannot emulate
+    # real network boundaries inside the containerized test environment.
 
     - name: Display security test requirements
       ansible.builtin.debug:
         msg:
-          - "Security tests documented in verify.yml for deployment validation"
-          - "See comments above for 3 critical security tests to implement"
+          - "Security checklist documented in verify.yml for post-deployment validation"
+          - "Follow the comment block above for firewall, network, and DNS token audits"

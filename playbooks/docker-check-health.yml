@@ -10,7 +10,8 @@
 
   tasks:
     - name: Get all containers status
-      ansible.builtin.command: docker ps -a --format json
+      ansible.builtin.command: >-
+        {% raw %}docker ps -a --format '{{ json . }}'{% endraw %}
       register: containers_raw
       changed_when: false
       check_mode: false
@@ -45,42 +46,9 @@
           }) }}
       changed_when: false
 
-    - name: Check oauth2-proxy health endpoint
-      ansible.builtin.uri:
-        url: "http://localhost:4180/ping"
-        status_code: 200
-      register: oauth2_health
-      retries: 5
-      delay: 2
-      until: oauth2_health is succeeded
-      ignore_errors: true
-      when: not (skip_oauth_health | default(false))
-
-    - name: Verify Zitadel NOT accessible externally
-      ansible.builtin.wait_for:
-        port: 8080
-        host: 0.0.0.0
-        state: stopped
-        timeout: 5
-      ignore_errors: true
-      register: zitadel_external
-      failed_when: zitadel_external is succeeded
-      when: not (skip_oauth_health | default(false))
-
-    - name: Verify oauth2-proxy OIDC discovery
-      ansible.builtin.uri:
-        url: "https://login.{{ lookup('env', 'DOMAIN') | default('rzp.one', true) }}/.well-known/openid-configuration"
-        status_code: 200
-        validate_certs: false
-      retries: 5
-      delay: 2
-      until: oidc_discovery is succeeded
-      register: oidc_discovery
-      ignore_errors: true
-      when: not (skip_oauth_health | default(false))
-
     - name: Get network status
-      ansible.builtin.command: docker network ls --format json
+      ansible.builtin.command: >-
+        {% raw %}docker network ls --format '{{ json . }}'{% endraw %}
       register: networks_raw
       changed_when: false
       check_mode: false
@@ -101,7 +69,6 @@
         required_networks:
           - traefik
           - socket-proxy
-          - bootstrap_zitadel
         actual_networks: "{{ networks_list | map(attribute='Name') | list }}"
       changed_when: false
 
@@ -130,7 +97,10 @@
     - name: Build health report
       ansible.builtin.set_fact:
         health_report:
-          timestamp: "{{ (ansible_date_time.iso8601 if (ansible_date_time is defined and ansible_date_time.iso8601 is defined) else lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
+          timestamp: >-
+            {{ (ansible_date_time.iso8601
+                if (ansible_date_time is defined and ansible_date_time.iso8601 is defined)
+                else lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}
           containers:
             total: "{{ container_analysis.total }}"
             running: "{{ container_analysis.running_count }}"

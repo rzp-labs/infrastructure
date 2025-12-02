@@ -1,6 +1,6 @@
 # Authentication Architecture
 
-This document describes the authentication gateway architecture that protects all infrastructure services with centralized authentication via Zitadel OIDC.
+> **Status:** Historical design. The active deployment currently runs Traefik as an internal-only reverse proxy without a centralized IdP; Zitadel and oauth2-proxy are not deployed.
 
 ## Overview
 
